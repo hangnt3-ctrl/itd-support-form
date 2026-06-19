@@ -801,20 +801,18 @@ function buildQHTML(q) {
     case 'manager_form': {
       const m = saved || {};
       html += `<div class="f-fields">
-        <div style="display:flex;flex-direction:column;gap:0">
-          <div class="f-field req" style="width:100%">
-            <label>Cấp 1 — Quản lý trực tiếp <span style="font-weight:400;color:#888;font-size:12px">(bắt buộc)</span></label>
-            <input type="text" id="mgr-email-1" placeholder="manager1@has.edu.vn; manager2@has.edu.vn" value="${esc(m.manager_email_1||'')}" oninput="onMgrInput()" style="width:100%;box-sizing:border-box;border-bottom-left-radius:0;border-bottom-right-radius:0;border-bottom:none">
-          </div>
-          <div class="f-field" style="width:100%">
-            <label style="margin-top:0">Cấp 2 — Quản lý cấp cao hơn <span style="font-weight:400;color:#888;font-size:12px">(nếu có)</span></label>
-            <input type="text" id="mgr-email-2" placeholder="director@has.edu.vn; vp@has.edu.vn" value="${esc(m.manager_email_2||'')}" oninput="onMgrInput()" style="width:100%;box-sizing:border-box;border-top-left-radius:0;border-top-right-radius:0">
-          </div>
+        <div class="f-field req">
+          <label>Cấp 1 — Quản lý trực tiếp <span style="font-weight:400;color:#888;font-size:12px">(bắt buộc)</span></label>
+          <input type="text" id="mgr-email-1" placeholder="manager1@has.edu.vn; manager2@has.edu.vn" value="${esc(m.manager_email_1||'')}" oninput="onMgrInput()">
+        </div>
+        <div class="f-field">
+          <label>Cấp 2 — Quản lý cấp cao hơn <span style="font-weight:400;color:#888;font-size:12px">(nếu có)</span></label>
+          <input type="text" id="mgr-email-2" placeholder="director@has.edu.vn; vp@has.edu.vn" value="${esc(m.manager_email_2||'')}" oninput="onMgrInput()">
           <div style="font-size:11px;color:#888;margin-top:4px">Nhiều email cách nhau bằng dấu ";" · Cấp 2 để trống nếu không cần</div>
         </div>
-        <div class="f-field" style="width:100%">
+        <div class="f-field">
           <label>Lý do cần xác nhận</label>
-          <textarea id="mgr-reason" rows="4" placeholder="Mô tả lý do yêu cầu cần quản lý xác nhận..." style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:10px 12px;border:1.5px solid #ddd;border-radius:8px;box-sizing:border-box" oninput="onMgrInput()">${esc(m.manager_reason||'')}</textarea>
+          <textarea id="mgr-reason" rows="4" placeholder="Mô tả lý do yêu cầu cần quản lý xác nhận..." style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:10px 12px;border:1.5px solid #e2e4ef;border-radius:8px;box-sizing:border-box;outline:none" oninput="onMgrInput()">${esc(m.manager_reason||'')}</textarea>
         </div>
       </div>`;
       break;
@@ -1949,4 +1947,8 @@ _resizeObs.observe(document.body);
 ║  ─────────────────────────────────────────────────────────  ║
 ║  1. Trong App vừa tạo → API permissions → Add a permission  ║
 ║  2. Chọn SharePoint → Delegated permissions                 ║
-║  3. 
+║  3. Tích CHỈ: AllSites.Write  (KHÔNG cần AllSites.Read)    ║
+║     AllSites.Write đã đủ để tạo item + đọc item của user   ║
+║  4. Grant admin consent for [tên tổ chức] → Yes             ║
+║                                                              ║
+║  BƯỚC 3 — Cấu hình bảo mật list ITD_Tickets (SP Admin)    
