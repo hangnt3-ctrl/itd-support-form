@@ -455,7 +455,7 @@ const state = {
   history: [],        // stack of visited Q IDs
   answers: {},        // { Q1: {label, value, ...extra}, ... }
   files: [],          // File objects from Q10
-  user: { name:'', email:'', department:'', employee_id:'' },
+  user: { name:'', email:'' },
   spContext: false,
 };
 
@@ -1105,9 +1105,6 @@ function buildConfirmRows() {
   // returns [{key, value, qId}]
   const rows = [];
   // Mã nhân viên — luôn hiện riêng nếu có
-  if (state.user.employee_id) {
-    rows.push({key:'Mã nhân viên', value: esc(state.user.employee_id), qId:'Q1'});
-  }
   // Người gửi — chỉ hiện nếu đã có tên (sau khi login MS)
   const senderLabel = [
     state.user.name,
@@ -1228,10 +1225,8 @@ function buildPayload() {
     form_id:   CONFIG.FORM_ID,
     form_name: 'Đăng ký hỗ trợ dịch vụ',
     submitted_by: {
-      full_name:   state.user.name,
-      email:       state.user.email,
-      department:  state.user.department,
-      employee_id: state.user.employee_id,
+      full_name: state.user.name,
+      email:     state.user.email,
     },
     answers,
     system_fields: {
@@ -1289,21 +1284,21 @@ async function sendSP(payload) {
     full_data:         JSON.stringify(payload),
   };
 
-  // Extended fields — cần chạy ITD_Setup_SP_Columns.ps1 trước khi dùng
+  // Extended fields — tên cột khớp với internal name trong SP list
   const extendedFields = {
     account_issue_type:   (ans.account_login_issue_type||{}).label || '',
     permission_type:      (ans.permission_request_type||{}).label  || '',
-    ManagerEmail:         [
-      (ans.manager_confirmation_info||{}).manager_email_1 || '',
-      (ans.manager_confirmation_info||{}).manager_email_2 || '',
-    ].filter(Boolean).join('; '),
-    manager_reason:       (ans.manager_confirmation_info||{}).manager_reason || '',
-    requester_name:       (ans.direct_user_info||{}).user_full_name   || '',
-    requester_email:      (ans.direct_user_info||{}).user_email       || '',
-    requester_dept:       (ans.direct_user_info||{}).user_department  || '',
-    user_start_date:      (ans.direct_user_info||{}).user_start_date  || '',
-    new_account_role:     (ans.account_registration||{}).role         || '',
-    new_account_group:    (ans.account_registration||{}).group        || '',
+    // Manager: ManagerEmail (PascalCase) = cấp 1, manager_email (lowercase) = cấp 2
+    ManagerEmail:         (ans.manager_confirmation_info||{}).manager_email_1 || '',
+    manager_email:        (ans.manager_confirmation_info||{}).manager_email_2 || '',
+    manager_reason:       (ans.manager_confirmation_info||{}).manager_reason  || '',
+    // Requester (Q14 — tạo tài khoản cho người khác)
+    requester_name:       (ans.direct_user_info||{}).user_full_name  || '',
+    requester_email:      (ans.direct_user_info||{}).user_email      || '',
+    requester_dept:       (ans.direct_user_info||{}).user_department || '',
+    user_start_date:      (ans.direct_user_info||{}).user_start_date || '',
+    new_account_role:     (ans.account_registration||{}).role        || '',
+    new_account_group:    (ans.account_registration||{}).group       || '',
   };
 
   const spPost = async (itemObj) => spFetch(
@@ -1316,7 +1311,7 @@ async function sendSP(payload) {
   if (!res.ok && res.status === 400) {
     const errText = await res.text().catch(() => '');
     if (errText.includes('InvalidClientQueryException') || errText.includes('property')) {
-      console.warn('[ITD] Một số cột SP chưa được tạo — fallback về core fields. Chạy ITD_Setup_SP_Columns.ps1 để tạo đủ cột.\nChi tiết:', errText.slice(0, 300));
+      console.warn('[ITD] Extended fields bị từ chối (400) — fallback về core. Kiểm tra tên cột SP.\nChi tiết:', errText.slice(0, 500));
       res = await spPost(coreItem);
     }
   }
@@ -1502,7 +1497,6 @@ function renderDone(ticketId) {
         ${state.user.email ? `<div class="user-email">${esc(state.user.email)}</div>` : ''}
         ${!state.user.name && !state.user.email ? `<div class="user-name" style="color:#888">Đã xác thực thành công</div>` : ''}
       </div>
-      ${state.user.employee_id ? `<span style="font-size:12px;font-weight:700;background:#f0edff;color:#5240a8;border-radius:6px;padding:3px 12px">Mã NV: ${esc(state.user.employee_id)}</span>` : ''}
     </div>
     <div class="confirm-table" style="margin-top:10px">
       <div class="confirm-row"><span class="confirm-key">Mã phiếu</span><span class="confirm-val" style="font-family:monospace;color:#1a4fa0">${esc(ticketId||'')}</span></div>
@@ -1623,8 +1617,7 @@ function resetForm() {
   state.history  = [];
   state.answers  = {};
   state.files    = [];
-  // Giữ state.user.name và state.user.email, chỉ xóa employee_id
-  state.user.employee_id = '';
+  // Giữ state.user.name và state.user.email
   document.getElementById('f-nav').innerHTML = `
     <button class="btn-back" id="btn-back" onclick="goBack()">← Quay lại</button>
     <button class="btn-next" id="btn-next" onclick="goNext()" disabled>
@@ -1847,9 +1840,8 @@ function renderTicketModal(item, fullData, spAttachments=[]) {
   ].filter(r => r[1] && r[1] !== '—');
 
   const submitterRows = [
-    ['Họ tên',       item.submitter_name || sub.full_name || '—'],
-    ['Email',        item.submitter_email || sub.email    || '—'],
-    ['Mã nhân viên', item.employee_id    || sub.employee_id || '—'],
+    ['Họ tên', item.submitter_name || sub.full_name || '—'],
+    ['Email',  item.submitter_email || sub.email    || '—'],
   ].filter(r => r[1] && r[1] !== '—');
 
   const requestRows = [

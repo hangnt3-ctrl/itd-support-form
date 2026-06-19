@@ -135,7 +135,8 @@ $RequiredColumns = @(
     @{ Name="TicketDescription";    Display="Mo ta yeu cau";              Type="Note"     },
     @{ Name="TicketImpact";         Display="Muc do anh huong";           Type="Text"     },
     # Quan ly (manager_form) -- ManagerName va manager_department da xoa (form khong thu thap)
-    @{ Name="ManagerEmail";         Display="Email quan ly";              Type="Text"     },
+    @{ Name="ManagerEmail";         Display="Email quan ly cap 1";        Type="Text"     },
+    @{ Name="manager_email";        Display="Email quan ly cap 2";        Type="Text"     },
     @{ Name="manager_reason";       Display="Ly do xac nhan";             Type="Note"     },
     # Tai khoan moi
     @{ Name="new_account_role";     Display="Chuc danh tai khoan moi";    Type="Text"     },
@@ -179,9 +180,9 @@ try {
     $existingView = Get-PnPView -List $ListName -Identity "ITD Admin" -ErrorAction SilentlyContinue
     if (-not $existingView) {
         Add-PnPView -List $ListName -Title "ITD Admin" `
-            -Fields @("ticket_id","submitter_name","submitter_email","submitter_department",
+            -Fields @("ticket_id","submitter_name","submitter_email",
                       "TicketGroup","TicketTool","TicketStatus","TicketPriority",
-                      "sla","submission_time","ManagerEmail","resolved_time") `
+                      "sla","submission_time","ManagerEmail","manager_email","resolved_time") `
             -Query '<OrderBy><FieldRef Name="submission_time" Ascending="FALSE"/></OrderBy>' `
             -RowLimit 100
         Write-New "View 'ITD Admin' -- DA TAO"
