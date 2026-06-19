@@ -837,14 +837,7 @@ function buildQHTML(q) {
           <div class="f-field req"><label>Họ và tên người dùng</label><input type="text" id="du-name" placeholder="Trần Văn C" value="${esc(u.user_full_name||'')}" oninput="onUserInfoInput()"></div>
           <div class="f-field"><label>Email cá nhân / công việc</label><input type="email" id="du-email" placeholder="c@gmail.com" value="${esc(u.user_email||'')}" oninput="onUserInfoInput()"></div>
         </div>
-        <div class="f-row">
-          <div class="f-field"><label>Số điện thoại</label><input type="tel" id="du-phone" placeholder="0901 234 567" value="${esc(u.user_phone||'')}" oninput="onUserInfoInput()"></div>
-          <div class="f-field"><label>Bộ phận / Đơn vị</label><input type="text" id="du-dept" placeholder="Phòng Kế toán" value="${esc(u.user_department||'')}" oninput="onUserInfoInput()"></div>
-        </div>
-        <div class="f-row">
-          <div class="f-field"><label>Chức danh / Vai trò</label><input type="text" id="du-role" placeholder="Kế toán viên" value="${esc(u.user_role||'')}" oninput="onUserInfoInput()"></div>
-          <div class="f-field"><label>Quản lý trực tiếp</label><input type="text" id="du-mgr" placeholder="Nguyễn Thị D" value="${esc(u.user_manager||'')}" oninput="onUserInfoInput()"></div>
-        </div>
+        <div class="f-field"><label>Bộ phận / Đơn vị</label><input type="text" id="du-dept" placeholder="Phòng Kế toán" value="${esc(u.user_department||'')}" oninput="onUserInfoInput()"></div>
         <div class="f-field"><label>Ngày bắt đầu cần tài khoản</label><input type="date" id="du-date" value="${esc(u.user_start_date||'')}" oninput="onUserInfoInput()"></div>
       </div>`;
       break;
@@ -964,10 +957,7 @@ function onUserInfoInput() {
   state.answers['Q14'] = {
     user_full_name:  name.trim(),
     user_email:      (document.getElementById('du-email')||{}).value||'',
-    user_phone:      (document.getElementById('du-phone')||{}).value||'',
     user_department: (document.getElementById('du-dept')||{}).value||'',
-    user_role:       (document.getElementById('du-role')||{}).value||'',
-    user_manager:    (document.getElementById('du-mgr')||{}).value||'',
     user_start_date: (document.getElementById('du-date')||{}).value||'',
   };
   setNextEnabled(!!(name.trim()));
@@ -1292,7 +1282,6 @@ async function sendSP(payload) {
     submission_time:   payload.submitted_at,
     submitter_name:    sub.full_name    || '',
     submitter_email:   sub.email        || '',
-    employee_id:       sub.employee_id  || '',
     TicketGroup:       (ans.support_need_group||{}).label      || '',
     TicketTool:        (ans.support_tool||{}).label            || '',
     TicketDescription: (ans.request_description||{}).value     || '',
@@ -1302,7 +1291,6 @@ async function sendSP(payload) {
 
   // Extended fields — cần chạy ITD_Setup_SP_Columns.ps1 trước khi dùng
   const extendedFields = {
-    submitter_department: sub.department        || '',
     account_issue_type:   (ans.account_login_issue_type||{}).label || '',
     permission_type:      (ans.permission_request_type||{}).label  || '',
     ManagerEmail:         [
@@ -1313,9 +1301,6 @@ async function sendSP(payload) {
     requester_name:       (ans.direct_user_info||{}).user_full_name   || '',
     requester_email:      (ans.direct_user_info||{}).user_email       || '',
     requester_dept:       (ans.direct_user_info||{}).user_department  || '',
-    user_phone:           (ans.direct_user_info||{}).user_phone       || '',
-    user_role_title:      (ans.direct_user_info||{}).user_role        || '',
-    user_manager:         (ans.direct_user_info||{}).user_manager     || '',
     user_start_date:      (ans.direct_user_info||{}).user_start_date  || '',
     new_account_role:     (ans.account_registration||{}).role         || '',
     new_account_group:    (ans.account_registration||{}).group        || '',
@@ -1456,14 +1441,13 @@ async function sendViaFlow(payload) {
     submission_time:   payload.submitted_at,
     submitter_name:    sub.full_name    || '',
     submitter_email:   sub.email        || '',
-    employee_id:       sub.employee_id  || '',
     TicketGroup:       (ans.support_need_group||{}).label  || '',
     TicketTool:        (ans.support_tool||{}).label        || '',
     TicketDescription: (ans.request_description||{}).value || '',
     TicketImpact:      (ans.impact_scope||{}).label        || '',
     TicketPriority:    sf.priority,
     sla:               sf.sla || '',
-    attachments,           // [{name, content_base64, type}] — flow dùng để tạo SP attachment
+    attachments,           // [{name, content_base64, type}] — flow dùng để tao SP attachment
     full_data:         JSON.stringify(payload),
   };
 
@@ -1802,7 +1786,7 @@ async function viewTicket(ticketId) {
     const filter = encodeURIComponent(
       "ticket_id eq '" + safeId + "' and submitter_email eq '" + safeEmail + "'"
     );
-    const select = '$select=Id,ticket_id,Title,TicketStatus,TicketPriority,TicketGroup,TicketTool,TicketImpact,submission_time,submitter_name,submitter_email,employee_id,sla,full_data';
+    const select = '$select=Id,ticket_id,Title,TicketStatus,TicketPriority,TicketGroup,TicketTool,TicketImpact,submission_time,submitter_name,submitter_email,sla,full_data';
     const url = CONFIG.SP_SITE + "/_api/lists/getByTitle('" + CONFIG.SP_LIST + "')/items?$filter=" + filter + '&' + select + '&$top=1';
     const res = await spFetch(url);
     if (!res.ok) throw new Error('HTTP ' + res.status);
