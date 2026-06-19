@@ -903,20 +903,6 @@ function onAccountRegInput() {
   setNextEnabled(true); // công cụ đã chọn ở Q2, Q13 không bắt buộc
 }
 
-// ── Manual user ─────────────────────────────────────────────
-function onManualUser() {
-  const empid = (document.getElementById('inp-empid')||{}).value||'';
-  state.user.employee_id = empid.trim();
-  // Show/hide live confirmation badge
-  const badge = document.getElementById('empid-confirm');
-  if (badge) {
-    badge.style.display = empid.trim() ? 'block' : 'none';
-    badge.textContent   = empid.trim() ? '✓ Đã ghi nhận: ' + empid.trim() : '';
-  }
-  const hasGroup = !!(state.answers['Q1']);
-  setNextEnabled(!!(hasGroup && empid.trim()));
-}
-
 // ── File upload ─────────────────────────────────────────────
 function fileSelect(e) {
   addFiles(Array.from(e.target.files));
@@ -1525,60 +1511,33 @@ function resetForm() {
 // ╔══════════════════════════════════════════════════════════╗
 // ║  HISTORY SCREEN                                          ║
 // ╚══════════════════════════════════════════════════════════╝
-function showHistory() {
-  const empid = (document.getElementById('inp-empid')||{}).value || state.user.employee_id || '';
-  if (!empid.trim()) { showToast('Vui lòng nhập mã nhân viên trước','error'); return; }
-  state.user.employee_id = empid.trim();
-
-  // Switch to history screen
-  document.getElementById('breadcrumb').innerHTML = '';
-  document.getElementById('progress-bar').style.width = '100%';
-  document.getElementById('step-counter').textContent = 'Lịch sử yêu cầu';
-  document.getElementById('step-label').textContent = empid.trim();
-
-  const slot = document.getElementById('q-slot');
-  slot.innerHTML = `<div class="hist-loading"><span>⏳ Đang tải lịch sử yêu cầu...</span></div>`;
-
-  // Nav: nút tạo mới + quay lại
-  document.getElementById('f-nav').innerHTML =
-    `<button class="btn-back" onclick="closeHistory()">← Quay lại</button>
-     <button class="btn-next" onclick="closeHistory()" style="flex:1">✏️ Tạo yêu cầu mới</button>`;
-
-  fetchHistory(empid.trim()).then(tickets => renderHistory(tickets))
-    .catch(err => {
-      slot.innerHTML = `<div class="hist-empty">⚠️ Không thể tải dữ liệu.<br><small>${esc(err.message)}</small></div>`;
-    });
-}
-
-async function fetchHistory(empid) {
-  // Dùng SharePoint REST API — miễn phí, không cần Power Automate
-  const siteUrl  = CONFIG.SP_SITE;
-  const listName = CONFIG.SP_LIST;
-  const filter   = encodeURIComponent("employee_id eq '" + empid.replace(/'/g,"''") + "'");
-  const select   = '$select=ticket_id,Title,TicketStatus,TicketPriority,submission_time,TicketTool,TicketGroup';
-  const order    = '$orderby=submission_time desc';
-  const top      = '$top=50';
-
-  const url = siteUrl + "/_api/lists/getByTitle('" + listName + "')/items?" +
-              '$filter=' + filter + '&' + select + '&' + order + '&' + top;
-
-  const res = await spFetch(url);
-  if (!res.ok) throw new Error('SharePoint: HTTP ' + res.status);
-  const data = await res.json();
-  const items = data.d?.results || [];
-
-  // Chuẩn hoá về cấu trúc mà renderHistory mong đợi
-  return items.map(it => ({
-    ticket_id:    it.ticket_id    || it.Id,
-    ticket_title: it.Title,
-    ticket_status:it.TicketStatus  || 'submitted',
-    priority:     it.TicketPriority|| 'P3',
-    submitted_at: it.submission_time || it.Created,
-    support_tool: it.TicketTool   || '',
-  }));
-}
-
 let _histAll = [];
+
+// Map giá trị SP (không dấu) → nhãn hiển thị + class badge
+// Khai báo 1 lần ở module scope, dùng chung cho _renderHistTable
+const STATUS_LBL = {
+  'Cho tiep nhan':           'Chờ tiếp nhận',
+  'Dang xu ly':              'Đang xử lý',
+  'Hoan thanh':              'Hoàn thành hôm nay',
+  'Da hoan thanh':           'Đã hoàn thành',
+  'Cho xac nhan quan ly':    'Chờ xác nhận QL',
+  'Tu choi':                 'Từ chối',
+  'Chờ tiếp nhận':'Chờ tiếp nhận',   'Đang xử lý':'Đang xử lý',
+  'Hoàn thành':'Hoàn thành hôm nay', 'Đã hoàn thành':'Đã hoàn thành',
+  'Chờ xác nhận quản lý':'Chờ xác nhận QL', 'Từ chối':'Từ chối',
+  submitted:'Đã tiếp nhận', in_progress:'Đang xử lý',
+  pending_manager_confirmation:'Chờ xác nhận', resolved:'Đã giải quyết', closed:'Đã đóng'
+};
+const STATUS_CLS = {
+  'Cho tiep nhan':'sb-new',    'Chờ tiếp nhận':'sb-new',
+  'Dang xu ly':'sb-active',    'Đang xử lý':'sb-active',
+  'Hoan thanh':'sb-done',      'Hoàn thành':'sb-done',
+  'Da hoan thanh':'sb-done',   'Đã hoàn thành':'sb-done',
+  'Cho xac nhan quan ly':'sb-pending', 'Chờ xác nhận quản lý':'sb-pending',
+  'Tu choi':'sb-done',         'Từ chối':'sb-done',
+  submitted:'sb-new', in_progress:'sb-active',
+  pending_manager_confirmation:'sb-pending', resolved:'sb-done', closed:'sb-done'
+};
 
 function renderHistory(tickets) {
   _histAll = tickets.slice().sort((a,b) => new Date(b.submitted_at) - new Date(a.submitted_at));
@@ -1588,33 +1547,6 @@ function renderHistory(tickets) {
 function _renderHistTable(list) {
   const slot = document.getElementById('q-slot');
   const count = list.length;
-
-  // Map giá trị SP (không dấu) → nhãn hiển thị + class badge
-  const STATUS_LBL = {
-    // Giá trị lưu trong SharePoint
-    'Cho tiep nhan':           'Chờ tiếp nhận',
-    'Dang xu ly':              'Đang xử lý',
-    'Hoan thanh':              'Hoàn thành hôm nay',
-    'Da hoan thanh':           'Đã hoàn thành',
-    'Cho xac nhan quan ly':    'Chờ xác nhận QL',
-    'Tu choi':                 'Từ chối',
-    // Fallback: giá trị có dấu (admin nhập tay) + English keys cũ
-    'Chờ tiếp nhận':'Chờ tiếp nhận',   'Đang xử lý':'Đang xử lý',
-    'Hoàn thành':'Hoàn thành hôm nay', 'Đã hoàn thành':'Đã hoàn thành',
-    'Chờ xác nhận quản lý':'Chờ xác nhận QL', 'Từ chối':'Từ chối',
-    submitted:'Đã tiếp nhận', in_progress:'Đang xử lý',
-    pending_manager_confirmation:'Chờ xác nhận', resolved:'Đã giải quyết', closed:'Đã đóng'
-  };
-  const STATUS_CLS = {
-    'Cho tiep nhan':'sb-new',    'Chờ tiếp nhận':'sb-new',
-    'Dang xu ly':'sb-active',    'Đang xử lý':'sb-active',
-    'Hoan thanh':'sb-done',      'Hoàn thành':'sb-done',
-    'Da hoan thanh':'sb-done',   'Đã hoàn thành':'sb-done',
-    'Cho xac nhan quan ly':'sb-pending', 'Chờ xác nhận quản lý':'sb-pending',
-    'Tu choi':'sb-done',         'Từ chối':'sb-done',
-    submitted:'sb-new', in_progress:'sb-active',
-    pending_manager_confirmation:'sb-pending', resolved:'sb-done', closed:'sb-done'
-  };
 
   let rows = '';
   if (!count) {
