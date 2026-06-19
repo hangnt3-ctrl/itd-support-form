@@ -264,7 +264,7 @@ const CONFIG = {
   //   (chỉ bật khi ITD_QueueStats chưa setup xong hoặc đang debug)
   // ALLOW_FLOW_BACKEND / ALLOW_GAS_BACKEND: false → chặn backend phụ không dùng
   //   (bật đúng backend được dùng, giữ các backend còn lại là false)
-  ALLOW_STATS_MAIN_LIST_FALLBACK: false,
+  ALLOW_STATS_MAIN_LIST_FALLBACK: true,  // fallback đếm từ ITD_Tickets khi ITD_QueueStats chưa sẵn sàng
   ALLOW_FLOW_BACKEND:             false,
   ALLOW_GAS_BACKEND:              false,
 
@@ -561,11 +561,20 @@ async function loadQueueStats() {
         await _loadStatsFromStatslist();
         return; // thành công → xong
       } catch(eStats) {
-        // Stats list lỗi (chưa tạo, sai tên, không có quyền) → thử fallback
+        // Stats list lỗi → kiểm tra flag trước khi fallback
+        if (!CONFIG.ALLOW_STATS_MAIN_LIST_FALLBACK) {
+          console.warn('[ITD] Không đọc được ' + CONFIG.SP_STATS_LIST + ':', eStats.message,
+            '— fallback bị tắt (ALLOW_STATS_MAIN_LIST_FALLBACK: false). Stats sẽ không hiển thị.');
+          return;
+        }
         console.warn('[ITD] Không đọc được ' + CONFIG.SP_STATS_LIST + ':', eStats.message,
           '→ fallback đếm từ', CONFIG.SP_LIST);
       }
     } else {
+      if (!CONFIG.ALLOW_STATS_MAIN_LIST_FALLBACK) {
+        console.warn('[ITD] SP_STATS_LIST chưa cấu hình và fallback bị tắt. Stats sẽ không hiển thị.');
+        return;
+      }
       console.warn('[ITD] SP_STATS_LIST chưa cấu hình → fallback về đếm từ main list.');
     }
     // Fallback: đếm trực tiếp từ ITD_Tickets
@@ -1139,7 +1148,7 @@ function buildConfirmRows() {
       case 'user_info_form':
         value = esc(ans.user_full_name) + (ans.user_department ? ' · ' + esc(ans.user_department) : ''); break;
       case 'account_reg_form': {
-        value = (ans.role || '') + (ans.group ? (ans.role ? ' · ' : '') + esc(ans.group) : '') || '(Không có thêm yêu cầu)'; break;
+        value = (ans.role ? esc(ans.role) : '') + (ans.group ? (ans.role ? ' · ' : '') + esc(ans.group) : '') || '(Không có thêm yêu cầu)'; break;
       }
     }
     if (value) rows.push({key: q.badge, value, qId});
@@ -2007,7 +2016,7 @@ _resizeObs.observe(document.body);
 ║  Bật item-level permission để SP chặn đọc chéo ticket:      ║
 ║  Site → ITD_Tickets → List Settings → Advanced Settings     ║
 ║  → Read access: "Read items that were created by the user"  ║
-║  → Edit access: "None"                                      ║
+║  → Edit access: "Create items and edit items that were created by the user"                                      ║
 ║  IT staff cần quyền "Manage Lists" để xem tất cả ticket.   ║
 ║                                                              ║
 ║  BƯỚC 4 — Tạo list ITD_QueueStats (thống kê header)        ║
