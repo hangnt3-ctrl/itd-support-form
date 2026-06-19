@@ -249,6 +249,8 @@ const CONFIG = {
   // ── SharePoint ──
   SP_SITE:       'https://haseduvn.sharepoint.com/sites/ITDSupport',
   SP_LIST:       'ITD_Tickets',
+  // List thứ 2 (song song) — điền tên list SP đã có sẵn, để '' nếu không dùng
+  SP_LIST_2:     '',
   // List thống kê riêng với quyền đọc mở (Everyone can read) — do Power Automate cập nhật
   // Nếu để trống sẽ fallback về đọc SP_LIST có phân trang (chậm hơn)
   SP_STATS_LIST: 'ITD_QueueStats',
@@ -555,17 +557,18 @@ async function loadQueueStats() {
   if (!state.user.email) return;
   try {
     if (CONFIG.SP_STATS_LIST) {
-      // Production path: đọc từ list thống kê riêng, không cần đọc toàn ITD_Tickets
-      await _loadStatsFromStatslist();
-      return;
+      try {
+        await _loadStatsFromStatslist();
+        return; // thành công → xong
+      } catch(eStats) {
+        // Stats list lỗi (chưa tạo, sai tên, không có quyền) → thử fallback
+        console.warn('[ITD] Không đọc được ' + CONFIG.SP_STATS_LIST + ':', eStats.message,
+          '→ fallback đếm từ', CONFIG.SP_LIST);
+      }
+    } else {
+      console.warn('[ITD] SP_STATS_LIST chưa cấu hình → fallback về đếm từ main list.');
     }
-    // SP_STATS_LIST chưa cấu hình — kiểm tra flag trước khi fallback
-    console.warn('[ITD] SP_STATS_LIST chưa được cấu hình. Hãy tạo list ITD_QueueStats và cập nhật CONFIG.SP_STATS_LIST.');
-    if (!CONFIG.ALLOW_STATS_MAIN_LIST_FALLBACK) {
-      console.warn('[ITD] Fallback đọc main list đang bị tắt (ALLOW_STATS_MAIN_LIST_FALLBACK: false). Stats sẽ không hiển thị.');
-      return;
-    }
-    console.warn('[ITD] Đang fallback về đọc toàn ITD_Tickets để tính stats — chỉ dùng tạm thời/dev.');
+    // Fallback: đếm trực tiếp từ ITD_Tickets
     await _loadStatsFromMainList();
   } catch(e) {
     console.warn('[ITD] Không tải được thống kê:', e);
@@ -1269,34 +1272,35 @@ async function sendSP(payload) {
   const ans = payload.answers;
   const sub = payload.submitted_by;
 
-  const item = {
+  // Core fields — chắc chắn tồn tại trong SP list
+  const coreItem = {
     __metadata:        { type: entityType },
-    // ── Thông tin chính ──
     Title:             sf.ticket_title,
     ticket_id:         sf.ticket_id,
     TicketStatus:      sf.ticket_status === 'pending_manager_confirmation' ? 'Cho xac nhan quan ly' : 'Cho tiep nhan',
     TicketPriority:    sf.priority,
     sla:               sf.sla || '',
     submission_time:   payload.submitted_at,
-    // ── Người gửi ──
-    submitter_name:       sub.full_name         || '',
-    submitter_email:      sub.email             || '',
+    submitter_name:    sub.full_name    || '',
+    submitter_email:   sub.email        || '',
+    employee_id:       sub.employee_id  || '',
+    TicketGroup:       (ans.support_need_group||{}).label      || '',
+    TicketTool:        (ans.support_tool||{}).label            || '',
+    TicketDescription: (ans.request_description||{}).value     || '',
+    TicketImpact:      (ans.impact_scope||{}).label            || '',
+    full_data:         JSON.stringify(payload),
+  };
+
+  // Extended fields — cần chạy ITD_Setup_SP_Columns.ps1 trước khi dùng
+  const extendedFields = {
     submitter_department: sub.department        || '',
-    employee_id:          sub.employee_id       || '',
-    // ── Phân loại ──
-    TicketGroup:          (ans.support_need_group||{}).label      || '',
     account_issue_type:   (ans.account_login_issue_type||{}).label || '',
     permission_type:      (ans.permission_request_type||{}).label  || '',
-    TicketTool:           (ans.support_tool||{}).label            || '',
-    TicketDescription:    (ans.request_description||{}).value     || '',
-    TicketImpact:         (ans.impact_scope||{}).label            || '',
-    // ── Quản lý (manager_form) ──
     ManagerEmail:         [
       (ans.manager_confirmation_info||{}).manager_email_1 || '',
       (ans.manager_confirmation_info||{}).manager_email_2 || '',
     ].filter(Boolean).join('; '),
     manager_reason:       (ans.manager_confirmation_info||{}).manager_reason || '',
-    // ── Thông tin người dùng Q14 (tạo tài khoản cho người khác) ──
     requester_name:       (ans.direct_user_info||{}).user_full_name   || '',
     requester_email:      (ans.direct_user_info||{}).user_email       || '',
     requester_dept:       (ans.direct_user_info||{}).user_department  || '',
@@ -1304,25 +1308,52 @@ async function sendSP(payload) {
     user_role_title:      (ans.direct_user_info||{}).user_role        || '',
     user_manager:         (ans.direct_user_info||{}).user_manager     || '',
     user_start_date:      (ans.direct_user_info||{}).user_start_date  || '',
-    // ── Tài khoản mới ──
     new_account_role:     (ans.account_registration||{}).role         || '',
     new_account_group:    (ans.account_registration||{}).group        || '',
-    // ── Toàn bộ dữ liệu JSON (chi tiết đọc từ đây) ──
-    full_data:            JSON.stringify(payload),
   };
 
-  // Bước 2: Tạo list item
-  const res = await spFetch(
+  const spPost = async (itemObj) => spFetch(
     siteUrl + "/_api/lists/getByTitle('" + listName + "')/items",
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json;odata=verbose' },
-      body: JSON.stringify(item),
-    }
+    { method: 'POST', headers: { 'Content-Type': 'application/json;odata=verbose' }, body: JSON.stringify(itemObj) }
   );
+
+  // Bước 2: Thử gửi full (core + extended), nếu 400 thì fallback về core only
+  let res = await spPost({ ...coreItem, ...extendedFields });
+  if (!res.ok && res.status === 400) {
+    const errText = await res.text().catch(() => '');
+    if (errText.includes('InvalidClientQueryException') || errText.includes('property')) {
+      console.warn('[ITD] Một số cột SP chưa được tạo — fallback về core fields. Chạy ITD_Setup_SP_Columns.ps1 để tạo đủ cột.\nChi tiết:', errText.slice(0, 300));
+      res = await spPost(coreItem);
+    }
+  }
   if (!res.ok) {
     const errText = await res.text().catch(() => '');
     throw new Error('SharePoint: HTTP ' + res.status + ' — ' + errText.slice(0, 200));
+  }
+
+  // Gửi song song sang SP_LIST_2 (nếu được cấu hình) — lỗi không ảnh hưởng list chính
+  if (CONFIG.SP_LIST_2) {
+    try {
+      const meta2Res = await spFetch(siteUrl + "/_api/lists/getByTitle('" + CONFIG.SP_LIST_2 + "')?$select=ListItemEntityTypeFullName");
+      if (!meta2Res.ok) throw new Error('HTTP ' + meta2Res.status);
+      const entityType2 = (await meta2Res.json()).d.ListItemEntityTypeFullName;
+      const spPost2 = (itemObj) => spFetch(
+        siteUrl + "/_api/lists/getByTitle('" + CONFIG.SP_LIST_2 + "')/items",
+        { method: 'POST', headers: { 'Content-Type': 'application/json;odata=verbose' }, body: JSON.stringify(itemObj) }
+      );
+      let res2 = await spPost2({ ...coreItem, ...extendedFields, __metadata: { type: entityType2 } });
+      if (!res2.ok && res2.status === 400) {
+        const e2 = await res2.text().catch(() => '');
+        if (e2.includes('InvalidClientQueryException') || e2.includes('property')) {
+          console.warn('[ITD] SP_LIST_2: một số cột chưa tồn tại, fallback core fields. Chi tiết:', e2.slice(0, 200));
+          res2 = await spPost2({ ...coreItem, __metadata: { type: entityType2 } });
+        }
+      }
+      if (!res2.ok) console.warn('[ITD] SP_LIST_2 ghi thất bại: HTTP', res2.status);
+      else console.log('[ITD] SP_LIST_2 (' + CONFIG.SP_LIST_2 + ') — ghi thành công');
+    } catch (e2) {
+      console.warn('[ITD] SP_LIST_2 lỗi (không ảnh hưởng list chính):', e2.message);
+    }
   }
 
   // Bước 3: Upload file đính kèm lên SP Attachments
