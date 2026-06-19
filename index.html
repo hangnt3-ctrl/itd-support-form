@@ -1279,16 +1279,36 @@ async function sendSP(payload) {
     sla:               sf.sla || '',
     submission_time:   payload.submitted_at,
     // ── Người gửi ──
-    submitter_name:    sub.full_name    || '',
-    submitter_email:   sub.email        || '',
-    employee_id:       sub.employee_id  || '',
+    submitter_name:       sub.full_name         || '',
+    submitter_email:      sub.email             || '',
+    submitter_department: sub.department        || '',
+    employee_id:          sub.employee_id       || '',
     // ── Phân loại ──
-    TicketGroup:       (ans.support_need_group||{}).label || '',
-    TicketTool:        (ans.support_tool||{}).label       || '',
-    TicketDescription: (ans.request_description||{}).value || '',
-    TicketImpact:      (ans.impact_scope||{}).label        || '',
+    TicketGroup:          (ans.support_need_group||{}).label      || '',
+    account_issue_type:   (ans.account_login_issue_type||{}).label || '',
+    permission_type:      (ans.permission_request_type||{}).label  || '',
+    TicketTool:           (ans.support_tool||{}).label            || '',
+    TicketDescription:    (ans.request_description||{}).value     || '',
+    TicketImpact:         (ans.impact_scope||{}).label            || '',
+    // ── Quản lý (manager_form) ──
+    ManagerEmail:         [
+      (ans.manager_confirmation_info||{}).manager_email_1 || '',
+      (ans.manager_confirmation_info||{}).manager_email_2 || '',
+    ].filter(Boolean).join('; '),
+    manager_reason:       (ans.manager_confirmation_info||{}).manager_reason || '',
+    // ── Thông tin người dùng Q14 (tạo tài khoản cho người khác) ──
+    requester_name:       (ans.direct_user_info||{}).user_full_name   || '',
+    requester_email:      (ans.direct_user_info||{}).user_email       || '',
+    requester_dept:       (ans.direct_user_info||{}).user_department  || '',
+    user_phone:           (ans.direct_user_info||{}).user_phone       || '',
+    user_role_title:      (ans.direct_user_info||{}).user_role        || '',
+    user_manager:         (ans.direct_user_info||{}).user_manager     || '',
+    user_start_date:      (ans.direct_user_info||{}).user_start_date  || '',
+    // ── Tài khoản mới ──
+    new_account_role:     (ans.account_registration||{}).role         || '',
+    new_account_group:    (ans.account_registration||{}).group        || '',
     // ── Toàn bộ dữ liệu JSON (chi tiết đọc từ đây) ──
-    full_data:         JSON.stringify(payload),
+    full_data:            JSON.stringify(payload),
   };
 
   // Bước 2: Tạo list item
@@ -1951,4 +1971,101 @@ _resizeObs.observe(document.body);
 ║     AllSites.Write đã đủ để tạo item + đọc item của user   ║
 ║  4. Grant admin consent for [tên tổ chức] → Yes             ║
 ║                                                              ║
-║  BƯỚC 3 — Cấu hình bảo mật list ITD_Tickets (SP Admin)    
+║  BƯỚC 3 — Cấu hình bảo mật list ITD_Tickets (SP Admin)     ║
+║  ─────────────────────────────────────────────────────────  ║
+║  Bật item-level permission để SP chặn đọc chéo ticket:      ║
+║  Site → ITD_Tickets → List Settings → Advanced Settings     ║
+║  → Read access: "Read items that were created by the user"  ║
+║  → Edit access: "None"                                      ║
+║  IT staff cần quyền "Manage Lists" để xem tất cả ticket.   ║
+║                                                              ║
+║  BƯỚC 4 — Tạo list ITD_QueueStats (thống kê header)        ║
+║  ─────────────────────────────────────────────────────────  ║
+║  Tạo list SharePoint tên "ITD_QueueStats" với 2 cột:       ║
+║    - stat_key  (Single line of text)                        ║
+║    - stat_value (Number)                                    ║
+║  Thêm 3 item: wait / active / done_today                   ║
+║  Cấp quyền Read cho "Everyone except external users"       ║
+║  Dùng Power Automate để cập nhật giá trị khi ticket đổi.  ║
+║                                                              ║
+║  BƯỚC 5 — Deploy lên GitHub Pages (miễn phí)                ║
+║  ─────────────────────────────────────────────────────────  ║
+║  1. Tạo GitHub repo (public hoặc private)                   ║
+║  2. Upload file ITD_Support_Form.html                       ║
+║  3. Settings → Pages → Source: main branch / root           ║
+║  4. URL form: https://[username].github.io/[repo]/ITD_Support_Form.html║
+║                                                              ║
+║  BƯỚC 6 — Cập nhật CONFIG trong file HTML                   ║
+║  ─────────────────────────────────────────────────────────  ║
+║  MSAL_CLIENT_ID:  [Application ID từ Bước 1]               ║
+║  MSAL_TENANT_ID:  [Directory ID từ Bước 1]                 ║
+║  SP_SITE:         'https://haseduvn.sharepoint.com/sites/ITDSupport'║
+║  SP_LIST:         'ITD_Tickets'                             ║
+║  SP_STATS_LIST:   'ITD_QueueStats'                          ║
+║                                                              ║
+║  Cấu hình production (khuyến nghị):                         ║
+║    BACKEND:                       'sharepoint'              ║
+║    SP_STATS_LIST:                 'ITD_QueueStats'          ║
+║    ALLOW_STATS_MAIN_LIST_FALLBACK: false                    ║
+║    ALLOW_FLOW_BACKEND:             false                    ║
+║    ALLOW_GAS_BACKEND:              false                    ║
+║                                                              ║
+║  Cấu hình dev/debug (tạm thời):                             ║
+║    ALLOW_STATS_MAIN_LIST_FALLBACK: true  ← khi QueueStats  ║
+║      chưa setup xong hoặc cần debug stats                  ║
+║    ALLOW_FLOW_BACKEND: true  ← chỉ khi test flow backend   ║
+║    ALLOW_GAS_BACKEND:  true  ← chỉ khi test GAS backend    ║
+║                                                              ║
+║  Lỗi thường gặp:                                            ║
+║  - "redirect_uri_mismatch": URL GitHub Pages chưa thêm      ║
+║    vào Redirect URIs trong Azure AD App                      ║
+║  - "consent_required": chưa Grant admin consent ở Bước 2   ║
+║  - "403 Forbidden SP": user không có quyền Contribute List  ║
+║                                                              ║
+║  OPTION B — Google Apps Script → Google Sheets               ║
+║                                                              ║
+║  1. Mở Google Sheet → Extensions → Apps Script               ║
+║  2. Paste:                                                    ║
+║                                                              ║
+║  function doPost(e) {                                         ║
+║    const d  = JSON.parse(e.postData.contents);               ║
+║    const ss = SpreadsheetApp.getActiveSpreadsheet();         ║
+║    let sh   = ss.getSheetByName('ITD_Tickets');              ║
+║    if (!sh) sh = ss.insertSheet('ITD_Tickets');              ║
+║    if (sh.getLastRow()===0) sh.appendRow([                   ║
+║      'TicketID','Title','SubmittedBy','Email','Dept',        ║
+║      'Group','SubType','Tool','Features','DirectUser',       ║
+║      'Description','Impact','Priority','SLA','Status',       ║
+║      'ManagerName','ManagerEmail','ManagerDept',             ║
+║      'Attachments','SubmittedAt'                             ║
+║    ]);                                                        ║
+║    const a = d.answers||{};                                  ║
+║    const s = d.system_fields||{};                            ║
+║    const sb = d.submitted_by||{};                            ║
+║    sh.appendRow([                                            ║
+║      s.ticket_id, s.ticket_title,                            ║
+║      sb.full_name, sb.email, sb.department,                  ║
+║      (a.support_need_group||{}).label||'',                   ║
+║      (a.account_login_issue_type||a.permission_request_type||{}).label||'',║
+║      (a.support_tool||{}).label||'',                         ║
+║      (a.requested_account_features||{}).value||'',           ║
+║      JSON.stringify(a.direct_user_info||{}),                 ║
+║      (a.request_description||{}).value||'',                  ║
+║      (a.impact_scope||{}).label||'',                         ║
+║      s.priority, s.sla, s.ticket_status,                     ║
+║      (a.manager_confirmation_info||{}).manager_name||'',     ║
+║      (a.manager_confirmation_info||{}).manager_email||'',    ║
+║      (a.manager_confirmation_info||{}).manager_department||'',║
+║      JSON.stringify(a.attachments||[]),                      ║
+║      d.submitted_at                                          ║
+║    ]);                                                        ║
+║    return ContentService                                      ║
+║      .createTextOutput(JSON.stringify({ok:true,id:s.ticket_id}))║
+║      .setMimeType(ContentService.MimeType.JSON);             ║
+║  }                                                            ║
+║                                                              ║
+║  3. Deploy → Web App → Execute as: Me                        ║
+║     Who has access: Anyone (hoặc Anyone with Google account) ║
+║  4. Copy URL → CONFIG.GOOGLE_SCRIPT_URL                      ║
+║  5. CONFIG.BACKEND = 'googlesheet'                           ║
+╚═══════════════════════════════════════
