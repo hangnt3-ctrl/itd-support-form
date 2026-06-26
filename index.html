@@ -20,9 +20,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .f-sub{font-size:11px;opacity:.55}
 /* ── HEADER STATS ── */
 .f-stats{display:flex;gap:0;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.18)}
-.f-stat-item{flex:1;text-align:center;padding:0 4px;cursor:pointer;border-radius:8px;transition:background .15s}
+.f-stat-item{flex:1;text-align:center;padding:4px 4px;cursor:pointer;border-radius:8px;transition:background .15s;box-sizing:border-box;border:1.5px solid transparent}
 .f-stat-item:hover{background:rgba(255,255,255,.12)}
-.f-stat-item.active-filter{background:rgba(255,255,255,.22);outline:1.5px solid rgba(255,255,255,.4)}
+.f-stat-item.active-filter{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.45)}
 .f-stat-item+.f-stat-item{border-left:1px solid rgba(255,255,255,.15)}
 .f-stat-num{font-size:20px;font-weight:800;line-height:1.1;letter-spacing:-1px}
 .f-stat-lbl{font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;opacity:.65;margin-top:4px;white-space:nowrap}
@@ -217,28 +217,29 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <div class="f-logo">Phòng Công nghệ Thông tin</div>
     <div class="f-title">Cổng hỗ trợ CNTT</div>
     <div id="hist-context-bar" style="display:none;margin:10px -28px -20px;padding:8px 28px;background:rgba(255,255,255,.12);border-top:1px solid rgba(255,255,255,.15)">
-      <span style="font-size:13px;font-weight:700;color:#fff;letter-spacing:.3px">Yêu cầu hỗ trợ của tôi</span>
+      <span style="font-size:13px;font-weight:700;color:#fff;letter-spacing:.3px">Tình trạng yêu cầu của bạn</span>
+      <span style="font-size:10px;opacity:.6;margin-left:8px">Bấm ô bên dưới để lọc nhanh</span>
     </div>
     <div class="f-stats" id="f-stats" style="display:none">
       <div class="f-stat-item" onclick="filterByStatCat('all')" id="si-all">
         <div class="f-stat-num" id="stat-all">—</div>
-        <div class="f-stat-lbl">Tất cả</div>
+        <div class="f-stat-lbl">Tất cả ›</div>
       </div>
       <div class="f-stat-item" onclick="filterByStatCat('wait')" id="si-wait">
         <div class="f-stat-num" id="stat-wait">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Chờ xử lý</div>
+        <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Chờ xử lý ›</div>
       </div>
       <div class="f-stat-item" onclick="filterByStatCat('active')" id="si-active">
         <div class="f-stat-num" id="stat-active">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Đang xử lý</div>
+        <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Đang xử lý ›</div>
       </div>
       <div class="f-stat-item" onclick="filterByStatCat('pending')" id="si-pending">
         <div class="f-stat-num" id="stat-pending">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot" style="color:#f97316">●</span>Chờ xác nhận</div>
+        <div class="f-stat-lbl"><span class="stat-dot" style="color:#f97316">●</span>Chờ xác nhận ›</div>
       </div>
       <div class="f-stat-item" onclick="filterByStatCat('done')" id="si-done">
         <div class="f-stat-num" id="stat-done">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-done">●</span>Đã xử lý xong</div>
+        <div class="f-stat-lbl"><span class="stat-dot dot-done">●</span>Đã xử lý xong ›</div>
       </div>
     </div>
   </div>
@@ -562,10 +563,8 @@ function showHistoryByEmail() {
   const slot = document.getElementById('q-slot');
   slot.innerHTML = `<div class="hist-loading"><span>⏳ Đang tải lịch sử yêu cầu...</span></div>`;
 
-  // Nav: nút làm mới + tạo yêu cầu mới
-  document.getElementById('f-nav').innerHTML =
-    `<button class="btn-back" onclick="showHistoryByEmail()" title="Cập nhật danh sách">🔄 Cập nhật</button>
-     <button class="btn-next" onclick="closeHistory()" style="flex:1">✏️ Gửi yêu cầu hỗ trợ mới</button>`;
+  // Ẩn nav — các nút đã có trong topbar của hist-wrap
+  document.getElementById('f-nav').style.display = 'none';
 
   _loadHistory(email, slot);
 
@@ -1742,31 +1741,23 @@ function _updateUserStats() {
 let _activeStat = 'all';
 function filterByStatCat(cat) {
   _activeStat = cat;
-  // Visual active state
+  // Visual active state (stat items ở header — không bị re-render)
   ['all','wait','active','pending','done'].forEach(c => {
     const el = document.getElementById('si-' + c);
     if (el) el.classList.toggle('active-filter', c === cat);
   });
-  if (cat === 'all') { _renderHistTable(_histAll); return; }
   const sl = s => (s||'').trim().toLowerCase();
-  const IS_DONE = s => s.startsWith('hoan')||s.startsWith('hoàn')||s==='resolved'||s==='closed'||s==='da hoan thanh';
-  const IS_ACTIVE = s => s.startsWith('dang')||s.startsWith('đang')||s==='in_progress';
+  const IS_DONE    = s => s.startsWith('hoan')||s.startsWith('hoàn')||s==='resolved'||s==='closed'||s==='da hoan thanh';
+  const IS_ACTIVE  = s => s.startsWith('dang')||s.startsWith('đang')||s==='in_progress';
   const IS_PENDING = s => s.startsWith('cho xac')||s.startsWith('chờ xác')||s==='pending_manager_confirmation';
-  const filtered = _histAll.filter(t => {
+  const filtered = cat === 'all' ? _histAll : _histAll.filter(t => {
     const s = sl(t.ticket_status);
     if (cat==='done')    return IS_DONE(s);
     if (cat==='active')  return IS_ACTIVE(s);
     if (cat==='pending') return IS_PENDING(s);
-    return !IS_DONE(s) && !IS_ACTIVE(s) && !IS_PENDING(s); // wait
+    return !IS_DONE(s) && !IS_ACTIVE(s) && !IS_PENDING(s);
   });
   _renderHistTable(filtered);
-  // Khôi phục active indicator sau khi re-render (re-render reset slot.innerHTML)
-  setTimeout(() => {
-    ['all','wait','active','pending','done'].forEach(c => {
-      const el = document.getElementById('si-' + c);
-      if (el) el.classList.toggle('active-filter', c === cat);
-    });
-  }, 0);
 }
 
 function _renderHistTable(list) {
@@ -1837,19 +1828,34 @@ function _renderHistTable(list) {
     </div>`;
   }
 
-  // Greeting
-  const greetName = state.user.name ? `Xin chào, ${esc(state.user.name)} 👋` : 'Xin chào 👋';
-  const greeting = `<div class="hist-greeting">
-    <div class="hist-greeting-name">${greetName}</div>
-    <div class="hist-greeting-sub">Bạn có thể theo dõi tình trạng xử lý hoặc gửi yêu cầu hỗ trợ mới tại đây.</div>
-  </div>`;
+  // Nếu wrapper đã có → chỉ cập nhật bảng, không re-render greeting/search/input
+  const existingWrap = document.getElementById('hist-table-container');
+  if (existingWrap) {
+    existingWrap.innerHTML = rows;
+    return;
+  }
+
+  // Lần đầu render: dựng toàn bộ layout
+  const greetName = state.user.name
+    ? `Xin chào, ${esc(state.user.name)} 👋`
+    : 'Xin chào 👋';
+  const greetSub = state.user.name
+    ? `Dưới đây là các yêu cầu hỗ trợ của <strong>${esc(state.user.name.split(' ').pop())}</strong>. Bấm vào từng yêu cầu để xem tiến độ xử lý.`
+    : 'Bấm vào từng yêu cầu để xem tiến độ xử lý hoặc gửi thêm yêu cầu mới.';
 
   slot.innerHTML = `<div class="hist-wrap">
-    ${greeting}
+    <div class="hist-greeting">
+      <div class="hist-greeting-name">${greetName}</div>
+      <div class="hist-greeting-sub">${greetSub}</div>
+    </div>
     <div class="hist-topbar" style="margin-top:12px">
       <div class="hist-search-wrap">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="hist-search" id="hist-search-inp" placeholder="Tìm theo mã yêu cầu, nội dung, hệ thống..." oninput="filterHist(this.value)">
+        <input class="hist-search" id="hist-search-inp"
+          placeholder="Tìm theo mã yêu cầu, nội dung, hệ thống..."
+          oninput="if(!this._composing) filterHist(this.value)"
+          oncompositionstart="this._composing=true"
+          oncompositionend="this._composing=false; filterHist(this.value)">
       </div>
       <button class="btn-new-top" onclick="closeHistory()">+ Gửi yêu cầu mới</button>
     </div>
@@ -1857,7 +1863,7 @@ function _renderHistTable(list) {
       <span class="hist-refresh-info"><span id="hist-refresh-ts">Cập nhật lần cuối: ${new Date().toLocaleTimeString('vi-VN')}</span> · ${_histAll.length} yêu cầu</span>
       <button class="btn-refresh-sm" onclick="showHistoryByEmail()">🔄 Cập nhật danh sách</button>
     </div>
-    ${rows}
+    <div id="hist-table-container">${rows}</div>
   </div>`;
 }
 
@@ -1869,8 +1875,7 @@ function filterHist(q) {
         (t.ticket_title||'').toLowerCase().includes(kw))
     : _histAll;
   _renderHistTable(filtered);
-  const inp = document.getElementById('hist-search-inp');
-  if (inp) { inp.value = q; inp.focus(); }
+  // Không cần set lại value/focus — input không bị re-render
 }
 
 function closeHistory() {
@@ -1882,6 +1887,8 @@ function closeHistory() {
   if (histTitle) histTitle.style.display = 'none';
   const statsEl = document.getElementById('f-stats');
   if (statsEl) statsEl.style.display = 'none';
+  // Khôi phục nav
+  document.getElementById('f-nav').style.display = '';
   // Khôi phục nav chuẩn rồi render Q1 (lúc này state.user.name đã có → hiện form)
   document.getElementById('f-nav').innerHTML = `
     <button class="btn-back" id="btn-back" onclick="goBack()">← Quay lại</button>
