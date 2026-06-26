@@ -201,15 +201,15 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <div class="f-stats" id="f-stats" style="display:none">
       <div class="f-stat-item">
         <div class="f-stat-num" id="stat-wait">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Chờ tiếp nhận</div>
+        <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Đang mở</div>
       </div>
       <div class="f-stat-item">
         <div class="f-stat-num" id="stat-active">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Đang xử lý</div>
+        <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Cần tôi phản hồi</div>
       </div>
       <div class="f-stat-item">
         <div class="f-stat-num" id="stat-done">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-done">●</span>Hoàn thành hôm nay</div>
+        <div class="f-stat-lbl"><span class="stat-dot dot-done">●</span>Đã hoàn thành</div>
       </div>
     </div>
   </div>
@@ -527,7 +527,7 @@ function showHistoryByEmail() {
 
   document.getElementById('breadcrumb').innerHTML = '';
   document.getElementById('progress-bar').style.width = '100%';
-  document.getElementById('step-counter').textContent = 'Lịch sử yêu cầu';
+  document.getElementById('step-counter').textContent = 'Yêu cầu của tôi';
   document.getElementById('step-label').textContent = state.user.name || email;
 
   const slot = document.getElementById('q-slot');
@@ -540,12 +540,9 @@ function showHistoryByEmail() {
 
   _loadHistory(email, slot);
 
-  // Hiện và làm mới thống kê header
+  // Hiện khu vực thống kê — số liệu sẽ được tính từ _histAll sau khi load xong
   const statsEl = document.getElementById('f-stats');
   if (statsEl) statsEl.style.display = 'flex';
-  if (_statsRefreshTimer) { clearInterval(_statsRefreshTimer); _statsRefreshTimer = null; }
-  loadQueueStats();
-  _statsRefreshTimer = setInterval(loadQueueStats, 3 * 60 * 1000);
 }
 
 // ── Auto-refresh lịch sử ─────────────────────────────────────
@@ -1509,7 +1506,9 @@ function renderDone(ticketId) {
   `;
   updateProgress(false, true);
   const nav = document.getElementById('f-nav');
-  nav.innerHTML = `<button class="btn-next" onclick="resetForm()">+ Gửi yêu cầu mới</button>`;
+  nav.innerHTML = `
+    <button class="btn-back" id="btn-back" onclick="showHistoryByEmail()">📋 Yêu cầu đã gửi</button>
+    <button class="btn-next" id="btn-next" onclick="resetForm()" style="flex:1">+ Gửi yêu cầu mới</button>`;
   document.getElementById('breadcrumb').innerHTML = '';
 }
 
@@ -1670,45 +1669,84 @@ function _resolveStatus(raw) {
 function renderHistory(tickets) {
   _histAll = tickets.slice().sort((a,b) => new Date(b.submitted_at) - new Date(a.submitted_at));
   _renderHistTable(_histAll);
+  _updateUserStats();
+}
+
+// Tính 3 chỉ số theo đúng tickets của người dùng hiện tại
+function _updateUserStats() {
+  const sl = s => (s || '').trim().toLowerCase();
+  const IS_DONE = s =>
+    s.startsWith('hoan') || s.startsWith('hoàn') || s.startsWith('đã hoàn') ||
+    s === 'resolved' || s === 'closed' || s === 'da hoan thanh';
+  const IS_NEED_REPLY = s =>
+    s.startsWith('cho xac') || s.startsWith('chờ xác') ||
+    s === 'pending_manager_confirmation' || s === 'can bo sung' || s.startsWith('cần bổ');
+
+  let open = 0, needReply = 0, done = 0;
+  _histAll.forEach(t => {
+    const s = sl(t.ticket_status);
+    if (IS_DONE(s)) {
+      done++;
+    } else {
+      open++;
+      if (IS_NEED_REPLY(s)) needReply++;
+    }
+  });
+
+  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setEl('stat-wait',   open);
+  setEl('stat-active', needReply);
+  setEl('stat-done',   done);
 }
 
 function _renderHistTable(list) {
   const slot = document.getElementById('q-slot');
   const count = list.length;
 
+  // Bỏ tên người gửi khỏi tiêu đề (suffix " - {tên}") vì user đang xem yêu cầu của chính mình
+  function cleanTitle(raw) {
+    if (!raw) return '(Không có tiêu đề)';
+    const name = state.user.name;
+    if (name) {
+      const suffix = ' - ' + name;
+      if (raw.endsWith(suffix)) return raw.slice(0, -suffix.length).trim();
+    }
+    return raw;
+  }
+
   let rows = '';
   if (!count) {
-    rows = `<div class="hist-empty">Chưa có yêu cầu nào.<br>Nhấn "← Quay lại" để tạo yêu cầu mới.</div>`;
+    rows = `<div class="hist-empty">Chưa có yêu cầu nào.<br>Nhấn "✏️ Tạo yêu cầu mới" để bắt đầu.</div>`;
   } else {
     list.forEach(t => {
       const date = t.submitted_at
         ? new Date(t.submitted_at).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'})
         : '';
-      // Dùng STATUS_META module-scope (tự fallback qua _resolveStatus)
-      const sm = STATUS_META[t.ticket_status] || _resolveStatus(t.ticket_status);
+      const sm   = STATUS_META[t.ticket_status] || _resolveStatus(t.ticket_status);
       const sCls = sm.cls;
       const sLbl = sm.label;
+      const title = cleanTitle(t.ticket_title);
       rows += `<div class="hist-tr">
         <div class="hist-td-id">${esc(t.ticket_id||'')}</div>
         <div>
-          <div class="hist-td-title">${esc(t.ticket_title||'(Không có tiêu đề)')}</div>
-          <div style="margin-top:5px;display:flex;gap:5px;flex-wrap:wrap">
-            <span class="sbadge ${sCls}">${esc(sLbl)}</span>
-            ${t.priority?`<span class="sbadge sb-${(t.priority||'').toLowerCase()}">${esc(t.priority)}</span>`:''}
-          </div>
+          <div class="hist-td-title">${esc(title)}</div>
+          ${t.priority?`<div style="margin-top:4px"><span class="sbadge sb-${(t.priority||'').toLowerCase()}">${esc(t.priority)}</span></div>`:''}
         </div>
-        <div class="hist-td-date">${date}</div>
+        <div class="hist-td-date">
+          <span class="sbadge ${sCls}">${esc(sLbl)}</span>
+          ${date?`<div style="margin-top:4px;font-size:10px;color:#aaa">${date}</div>`:''}
+        </div>
         <div class="hist-td-act">
           <button class="btn-xem" data-ticket-id="${escAttr(t.ticket_id||'')}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/></svg>
-            Xem
+            Chi tiết
           </button>
         </div>
       </div>`;
     });
     rows = `<div class="hist-table-wrap">
       <div class="hist-thead">
-        <div>Mã yêu cầu</div><div>Tên yêu cầu</div><div>Ngày gửi</div><div></div>
+        <div>Mã yêu cầu</div><div>Nội dung yêu cầu</div><div>Tình trạng</div><div></div>
       </div>
       <div class="hist-tbody">${rows}</div>
     </div>`;
@@ -1718,7 +1756,7 @@ function _renderHistTable(list) {
     <div class="hist-topbar">
       <div class="hist-search-wrap">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="hist-search" id="hist-search-inp" placeholder="Tìm theo mã hoặc tên yêu cầu..." oninput="filterHist(this.value)">
+        <input class="hist-search" id="hist-search-inp" placeholder="Tìm mã yêu cầu hoặc nội dung..." oninput="filterHist(this.value)">
       </div>
       <span class="hist-count">${_histAll.length} yêu cầu</span>
       <span id="hist-refresh-ts" style="font-size:11px;color:#bbb;white-space:nowrap">

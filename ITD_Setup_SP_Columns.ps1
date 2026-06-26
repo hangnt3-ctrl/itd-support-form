@@ -193,5 +193,4 @@ try {
 
 Write-Host "`n============================================" -ForegroundColor Green
 Write-Host " HOAN THANH -- Kiem tra lai tai:" -ForegroundColor Green
-Write-Host " $SiteUrl/Lists/$ListName/AllItems.aspx" -ForegroundColor Green
-Write-Host "============================================`n" -ForegroundColor Green
+Write-Host " $SiteUrl/Lists/$ListName/AllItems.aspx" -ForegroundColor Gre
