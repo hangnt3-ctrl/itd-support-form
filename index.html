@@ -25,7 +25,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .f-stat-item.active-filter{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.45)}
 .f-stat-item+.f-stat-item{border-left:1px solid rgba(255,255,255,.15)}
 .f-stat-num{font-size:20px;font-weight:800;line-height:1.1;letter-spacing:-1px}
-.f-stat-lbl{font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;opacity:.65;margin-top:4px;white-space:nowrap}
+.f-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.2px;opacity:.82;margin-top:4px;white-space:nowrap}
 .stat-dot{font-size:8px;margin-right:3px}
 .dot-wait{color:#fbbf24}
 .dot-active{color:#34d399}
@@ -40,7 +40,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .bc-chip{font-size:10px;background:#f0edff;color:#5240a8;border-radius:6px;padding:2px 8px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
 .bc-sep{color:#ccc;font-size:10px}
 /* ── BODY ── */
-.f-body{padding:22px 24px 8px;overflow-y:auto;flex:1 1 auto}
+.f-body{padding:22px 28px 8px;overflow-y:auto;flex:1 1 auto}
 /* ── QUESTION ── */
 .q-badge{display:inline-block;font-size:10px;font-weight:700;background:#f0edff;color:#5240a8;border-radius:6px;padding:2px 8px;margin-bottom:10px;letter-spacing:.5px}
 .q-title{font-size:15px;font-weight:700;color:#1a1b2e;margin-bottom:16px;line-height:1.5}
@@ -147,41 +147,42 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .hist-link:hover{color:#3a3cbf}
 /* ── History screen ── */
 @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
-.hist-wrap{margin:-8px -4px}
+.hist-wrap{margin:-8px 0}
 .hist-topbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .hist-search-wrap{display:flex;align-items:center;background:#fff;border:1.5px solid #d1d5e8;border-radius:8px;overflow:hidden;flex:1;min-width:160px}
 .hist-search-wrap svg{margin-left:10px;flex-shrink:0;color:#aaa}
 .hist-search{border:none;outline:none;padding:8px 10px;font-size:13px;width:100%;font-family:inherit;color:#333}
 .hist-count{font-size:12px;color:#888;white-space:nowrap;margin-left:auto}
 .hist-table-wrap{border:1.5px solid #e2e4ef;border-radius:10px;overflow:hidden}
-.hist-thead{display:grid;grid-template-columns:1fr 110px 72px 88px 82px;background:#f8f9ff;border-bottom:1.5px solid #e2e4ef;padding:9px 14px;font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px;gap:10px}
+.hist-thead{display:grid;grid-template-columns:1fr 110px 72px 86px 88px;background:#f8f9ff;border-bottom:1.5px solid #e2e4ef;padding:10px 20px;font-size:11px;font-weight:700;color:#888;letter-spacing:.2px;gap:10px}
 .hist-tbody{}
-.hist-tr{display:grid;grid-template-columns:1fr 110px 72px 88px 82px;padding:10px 14px;border-bottom:1px solid #f0f1f8;gap:10px;align-items:center;transition:background .1s}
+.hist-tr{display:grid;grid-template-columns:1fr 110px 72px 86px 88px;padding:12px 20px;border-bottom:1px solid #f0f1f8;gap:10px;align-items:center;transition:background .1s}
 .hist-tr:last-child{border:none}
 .hist-tr:hover{background:#fafbff}
 .hist-td-id{font-size:12px;font-weight:700;color:#1a4fa0;cursor:default;font-variant-numeric:tabular-nums;word-break:break-all}
-.hist-td-title{font-size:13px;color:#1a1b2e;line-height:1.45}
+.hist-td-title{font-size:13px;color:#1a1b2e;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .hist-td-date{font-size:11px;color:#888;white-space:nowrap}
 .hist-td-act{display:flex;justify-content:flex-end}
-.sbadge{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
-.sb-new{background:#dbeafe;color:#1d4ed8}
-.sb-active{background:#dcfce7;color:#15803d}
-.sb-pending{background:#fef9c3;color:#854d0e}
-.sb-done{background:#f3e8ff;color:#6b21a8}
+.sbadge{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}
+.sb-new{background:#e0f2fe;color:#0369a1}
+.sb-active{background:#dcfce7;color:#166534}
+.sb-pending{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.sb-done{background:#f0fdf4;color:#15803d}
 .sb-p1{background:#fee2e2;color:#b91c1c}
 .sb-p2{background:#fef3c7;color:#92400e}
 .sb-p3{background:#d1fae5;color:#065f46}
-.btn-xem{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:none;background:#dbeafe;color:#1d4ed8;cursor:pointer;transition:background .12s;white-space:nowrap}
-.btn-xem:hover{background:#bfdbfe}
-.btn-track{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:none;background:#dcfce7;color:#15803d;cursor:pointer;transition:background .12s;white-space:nowrap}
-.btn-track:hover{background:#bbf7d0}
-.btn-confirm{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:none;background:#fef9c3;color:#854d0e;cursor:pointer;transition:background .12s;white-space:nowrap}
-.btn-confirm:hover{background:#fef08a}
-.btn-rate{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:none;background:#f3e8ff;color:#6b21a8;cursor:pointer;transition:background .12s;white-space:nowrap}
-.btn-rate:hover{background:#e9d5ff}
-.hist-topbar-row2{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
-.hist-refresh-info{font-size:11px;color:#bbb;flex:1}
-.btn-refresh-sm{font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:1.5px solid #d1d5e8;background:#fff;color:#6264a7;cursor:pointer;white-space:nowrap}
+.btn-xem{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1.5px solid #c7d7f4;background:#fff;color:#2563eb;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn-xem:hover{background:#eff6ff;border-color:#93c5fd}
+.btn-track{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1.5px solid #bbf7d0;background:#fff;color:#15803d;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn-track:hover{background:#f0fdf4}
+.btn-confirm{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:7px;border:none;background:#ea580c;color:#fff;cursor:pointer;transition:all .12s;white-space:nowrap;box-shadow:0 1px 4px rgba(234,88,12,.3)}
+.btn-confirm:hover{background:#c2410c}
+.btn-rate{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1.5px solid #e9d5ff;background:#fff;color:#7c3aed;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn-rate:hover{background:#faf5ff}
+.hist-info-bar{display:flex;align-items:center;justify-content:space-between;margin:10px 0 14px;flex-wrap:wrap;gap:6px}
+.hist-section-title{font-size:13px;font-weight:700;color:#1a1b2e}
+.hist-refresh-info{font-size:11px;color:#aaa}
+.btn-refresh-sm{font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;border:1.5px solid #d1d5e8;background:#fff;color:#6264a7;cursor:pointer;white-space:nowrap;display:none}
 .btn-refresh-sm:hover{background:#f4f4fc}
 .btn-new-top{font-size:12px;font-weight:700;padding:7px 14px;border-radius:8px;border:none;background:#6264a7;color:#fff;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
 .btn-new-top:hover{background:#4a4cbf}
@@ -218,7 +219,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <div class="f-title">Cổng hỗ trợ CNTT</div>
     <div id="hist-context-bar" style="display:none;margin:10px -28px -20px;padding:8px 28px;background:rgba(255,255,255,.12);border-top:1px solid rgba(255,255,255,.15)">
       <span style="font-size:13px;font-weight:700;color:#fff;letter-spacing:.3px">Tình trạng yêu cầu của bạn</span>
-      <span style="font-size:10px;opacity:.6;margin-left:8px">Bấm ô bên dưới để lọc nhanh</span>
+      <span style="font-size:10px;opacity:.65;margin-left:6px;font-weight:400">Nhấn vào từng ô để lọc danh sách bên dưới</span>
     </div>
     <div class="f-stats" id="f-stats" style="display:none">
       <div class="f-stat-item" onclick="filterByStatCat('all')" id="si-all">
@@ -678,7 +679,7 @@ function _loadHistory(email, slot) {
         renderHistory(tickets);
         // Cập nhật timestamp làm mới
         const ts = document.getElementById('hist-refresh-ts');
-        if (ts) ts.textContent = 'Cập nhật lúc ' + new Date().toLocaleTimeString('vi-VN');
+        if (ts) ts.textContent = new Date().toLocaleTimeString('vi-VN');
       })
       .catch(err => {
         if (showLoading) {
@@ -1815,14 +1816,14 @@ function _renderHistTable(list) {
           <div class="hist-td-sub">${esc(t.ticket_id||'')}</div>
         </div>
         <div><span class="sbadge ${sCls}">${esc(sLbl)}</span></div>
-        <div>${prio ? `<span class="sbadge sb-${prio.toLowerCase()}" title="${esc(prioLabel(prio))}">${esc(prio)}</span>` : ''}</div>
+        <div>${prio ? `<span class="sbadge sb-${prio.toLowerCase()}" style="font-size:9px">${esc(prioLabel(prio))}</span>` : ''}</div>
         <div style="font-size:11px;color:#888;white-space:nowrap">${date}</div>
         <div class="hist-td-act">${actionBtn(t.ticket_status, t.ticket_id)}</div>
       </div>`;
     });
     rows = `<div class="hist-table-wrap">
       <div class="hist-thead">
-        <div>Nội dung yêu cầu</div><div>Tình trạng</div><div>Ưu tiên</div><div>Ngày tạo</div><div></div>
+        <div>Nội dung yêu cầu</div><div>Tình trạng</div><div>Ưu tiên</div><div>Ngày tạo</div><div>Thao tác</div>
       </div>
       <div class="hist-tbody">${rows}</div>
     </div>`;
@@ -1839,29 +1840,29 @@ function _renderHistTable(list) {
   const greetName = state.user.name
     ? `Xin chào, ${esc(state.user.name)} 👋`
     : 'Xin chào 👋';
-  const greetSub = state.user.name
-    ? `Dưới đây là các yêu cầu hỗ trợ của <strong>${esc(state.user.name.split(' ').pop())}</strong>. Bấm vào từng yêu cầu để xem tiến độ xử lý.`
-    : 'Bấm vào từng yêu cầu để xem tiến độ xử lý hoặc gửi thêm yêu cầu mới.';
 
   slot.innerHTML = `<div class="hist-wrap">
     <div class="hist-greeting">
       <div class="hist-greeting-name">${greetName}</div>
-      <div class="hist-greeting-sub">${greetSub}</div>
+      <div class="hist-greeting-sub">Bạn có thể theo dõi các yêu cầu đã gửi và xem tiến độ xử lý tại đây.</div>
     </div>
     <div class="hist-topbar" style="margin-top:12px">
       <div class="hist-search-wrap">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input class="hist-search" id="hist-search-inp"
-          placeholder="Tìm theo mã yêu cầu, nội dung, hệ thống..."
+          placeholder="Tìm theo mã yêu cầu, nội dung, hệ thống hoặc người liên quan..."
           oninput="if(!this._composing) filterHist(this.value)"
           oncompositionstart="this._composing=true"
           oncompositionend="this._composing=false; filterHist(this.value)">
       </div>
-      <button class="btn-new-top" onclick="closeHistory()">+ Gửi yêu cầu mới</button>
+      <button class="btn-refresh-sm" style="display:inline-flex" onclick="showHistoryByEmail()" title="Cập nhật danh sách">🔄 Cập nhật</button>
+      <button class="btn-new-top" onclick="closeHistory()">+ Gửi yêu cầu hỗ trợ mới</button>
     </div>
-    <div class="hist-topbar-row2">
-      <span class="hist-refresh-info"><span id="hist-refresh-ts">Cập nhật lần cuối: ${new Date().toLocaleTimeString('vi-VN')}</span> · ${_histAll.length} yêu cầu</span>
-      <button class="btn-refresh-sm" onclick="showHistoryByEmail()">🔄 Cập nhật danh sách</button>
+    <div class="hist-info-bar">
+      <div>
+        <div class="hist-section-title">Danh sách yêu cầu đã gửi</div>
+        <div class="hist-refresh-info">${_histAll.length} yêu cầu · Cập nhật lần cuối: <span id="hist-refresh-ts">${new Date().toLocaleTimeString('vi-VN')}</span></div>
+      </div>
     </div>
     <div id="hist-table-container">${rows}</div>
   </div>`;
