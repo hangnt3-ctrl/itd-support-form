@@ -125,7 +125,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .confirm-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px}
 /* ── DONE SCREEN ── */
 .done-card{background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:20px 22px;text-align:center;margin-bottom:16px}
-.done-id{font-size:24px;font-weight:900;color:#15803d;font-variant-numeric:tabular-nums}
+.done-id{font-size:16px;font-weight:500;color:#15803d;font-family:monospace;letter-spacing:.5px}
 .done-label{font-size:12px;color:#4ade80;margin-bottom:10px}
 .done-msg{font-size:13px;color:#166534;line-height:1.6}
 /* ── SPINNER ── */
@@ -152,9 +152,9 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .hist-search{border:none;outline:none;padding:8px 10px;font-size:13px;width:100%;font-family:inherit;color:#333}
 .hist-count{font-size:12px;color:#888;white-space:nowrap;margin-left:auto}
 .hist-table-wrap{border:1.5px solid #e2e4ef;border-radius:10px;overflow:hidden}
-.hist-thead{display:grid;grid-template-columns:110px 1fr 110px 80px;background:#f8f9ff;border-bottom:1.5px solid #e2e4ef;padding:9px 14px;font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px;gap:12px}
+.hist-thead{display:grid;grid-template-columns:110px 1fr 120px 88px 72px;background:#f8f9ff;border-bottom:1.5px solid #e2e4ef;padding:9px 14px;font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.4px;gap:12px}
 .hist-tbody{}
-.hist-tr{display:grid;grid-template-columns:110px 1fr 110px 80px;padding:11px 14px;border-bottom:1px solid #f0f1f8;gap:12px;align-items:center;transition:background .1s}
+.hist-tr{display:grid;grid-template-columns:110px 1fr 120px 88px 72px;padding:11px 14px;border-bottom:1px solid #f0f1f8;gap:12px;align-items:center;transition:background .1s}
 .hist-tr:last-child{border:none}
 .hist-tr:hover{background:#fafbff}
 .hist-td-id{font-size:12px;font-weight:700;color:#1a4fa0;cursor:default;font-variant-numeric:tabular-nums;word-break:break-all}
@@ -198,6 +198,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="f-header">
     <div class="f-logo">Phòng Công nghệ Thông tin</div>
     <div class="f-title">Đăng ký hỗ trợ</div>
+    <div id="hist-header-title" style="display:none;font-size:15px;font-weight:800;color:#fff;margin-bottom:6px">Yêu cầu của tôi</div>
     <div class="f-stats" id="f-stats" style="display:none">
       <div class="f-stat-item">
         <div class="f-stat-num" id="stat-wait">—</div>
@@ -540,7 +541,9 @@ function showHistoryByEmail() {
 
   _loadHistory(email, slot);
 
-  // Hiện khu vực thống kê — số liệu sẽ được tính từ _histAll sau khi load xong
+  // Hiện tiêu đề + thống kê trong header
+  const histTitle = document.getElementById('hist-header-title');
+  if (histTitle) histTitle.style.display = 'block';
   const statsEl = document.getElementById('f-stats');
   if (statsEl) statsEl.style.display = 'flex';
 }
@@ -1189,8 +1192,12 @@ function buildPayload() {
   const impOpt  = getImpactOption();
   const ans4    = state.answers['Q4'] || {};
   const status  = ans4.value === 'individual' ? 'submitted' : 'pending_manager_confirmation';
-  const year    = new Date().getFullYear();
-  const ticketId = CONFIG.ORG_PREFIX + '-' + year + '-' + Date.now();
+  const _now = new Date();
+  const _dd  = String(_now.getDate()).padStart(2,'0');
+  const _mm  = String(_now.getMonth()+1).padStart(2,'0');
+  const _yy  = String(_now.getFullYear()).slice(-2);
+  const _seq = String(Date.now() % 100000).padStart(5,'0');
+  const ticketId = CONFIG.ORG_PREFIX + '-' + _dd + _mm + _yy + '-' + _seq;
   const q1ans   = state.answers['Q1'] || {};
   const q2ans   = state.answers['Q2'] || {};
   const q14ans  = state.answers['Q14'] || {};
@@ -1520,12 +1527,15 @@ function updateProgress(isConfirm, isDone) {
   const visited = state.history.length + (isConfirm||isDone ? 1 : 0);
   const pct    = isDone ? 100 : Math.min(95, Math.max(5, Math.round((visited/total)*100)));
   document.getElementById('progress-bar').style.width = pct+'%';
+  const q = QUESTIONS[state.currentQ];
+  const onQ1 = !isConfirm && !isDone && state.currentQ === 'Q1';
+  const stepInfo = document.getElementById('f-step-info');
+  if (stepInfo) stepInfo.style.visibility = onQ1 ? 'hidden' : 'visible';
   document.getElementById('step-counter').textContent = isDone
     ? 'Hoàn tất ✓'
-    : (isConfirm ? 'Xác nhận & Gửi' : 'Câu '+  (state.history.length+1));
-  const q = QUESTIONS[state.currentQ];
+    : (isConfirm ? 'Xác nhận & Gửi' : 'Câu ' + (state.history.length + 1));
   document.getElementById('step-label').textContent = isDone
-    ? 'Yêu cầu đã gửi'
+    ? ''
     : (isConfirm ? 'Kiểm tra thông tin' : (q ? q.badge : ''));
 }
 
@@ -1732,10 +1742,8 @@ function _renderHistTable(list) {
           <div class="hist-td-title">${esc(title)}</div>
           ${t.priority?`<div style="margin-top:4px"><span class="sbadge sb-${(t.priority||'').toLowerCase()}">${esc(t.priority)}</span></div>`:''}
         </div>
-        <div class="hist-td-date">
-          <span class="sbadge ${sCls}">${esc(sLbl)}</span>
-          ${date?`<div style="margin-top:4px;font-size:10px;color:#aaa">${date}</div>`:''}
-        </div>
+        <div class="hist-td-date"><span class="sbadge ${sCls}">${esc(sLbl)}</span></div>
+        <div style="font-size:11px;color:#888;white-space:nowrap">${date}</div>
         <div class="hist-td-act">
           <button class="btn-xem" data-ticket-id="${escAttr(t.ticket_id||'')}">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/></svg>
@@ -1746,7 +1754,7 @@ function _renderHistTable(list) {
     });
     rows = `<div class="hist-table-wrap">
       <div class="hist-thead">
-        <div>Mã yêu cầu</div><div>Nội dung yêu cầu</div><div>Tình trạng</div><div></div>
+        <div>Mã yêu cầu</div><div>Nội dung yêu cầu</div><div>Tình trạng</div><div>Ngày tạo</div><div></div>
       </div>
       <div class="hist-tbody">${rows}</div>
     </div>`;
@@ -1783,7 +1791,9 @@ function closeHistory() {
   // Hủy auto-refresh timer khi rời màn hình lịch sử
   if (_histRefreshTimer)  { clearInterval(_histRefreshTimer);  _histRefreshTimer  = null; }
   if (_statsRefreshTimer) { clearInterval(_statsRefreshTimer); _statsRefreshTimer = null; }
-  // Ẩn stats khi vào form
+  // Ẩn tiêu đề lịch sử + stats khi vào form
+  const histTitle = document.getElementById('hist-header-title');
+  if (histTitle) histTitle.style.display = 'none';
   const statsEl = document.getElementById('f-stats');
   if (statsEl) statsEl.style.display = 'none';
   // Khôi phục nav chuẩn rồi render Q1 (lúc này state.user.name đã có → hiện form)
