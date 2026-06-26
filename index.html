@@ -22,7 +22,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .f-stats{display:flex;gap:0;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.18)}
 .f-stat-item{flex:1;text-align:center;padding:0 4px}
 .f-stat-item+.f-stat-item{border-left:1px solid rgba(255,255,255,.15)}
-.f-stat-num{font-size:24px;font-weight:800;line-height:1.1;letter-spacing:-1px}
+.f-stat-num{font-size:20px;font-weight:800;line-height:1.1;letter-spacing:-1px}
 .f-stat-lbl{font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;opacity:.65;margin-top:4px;white-space:nowrap}
 .stat-dot{font-size:8px;margin-right:3px}
 .dot-wait{color:#fbbf24}
@@ -198,15 +198,21 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="f-header">
     <div class="f-logo">Phòng Công nghệ Thông tin</div>
     <div class="f-title">Đăng ký hỗ trợ</div>
-    <div id="hist-header-title" style="display:none;font-size:15px;font-weight:800;color:#fff;margin-bottom:6px">Yêu cầu của tôi</div>
+    <div id="hist-context-bar" style="display:none;margin:10px -28px -20px;padding:8px 28px;background:rgba(255,255,255,.12);border-top:1px solid rgba(255,255,255,.15)">
+      <span style="font-size:13px;font-weight:700;color:#fff;letter-spacing:.3px">Yêu cầu của tôi</span>
+    </div>
     <div class="f-stats" id="f-stats" style="display:none">
       <div class="f-stat-item">
         <div class="f-stat-num" id="stat-wait">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Đang mở</div>
+        <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Chờ xử lý</div>
       </div>
       <div class="f-stat-item">
         <div class="f-stat-num" id="stat-active">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Cần tôi phản hồi</div>
+        <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Đang xử lý</div>
+      </div>
+      <div class="f-stat-item">
+        <div class="f-stat-num" id="stat-pending">—</div>
+        <div class="f-stat-lbl"><span class="stat-dot" style="color:#f97316">●</span>Chờ QL xác nhận</div>
       </div>
       <div class="f-stat-item">
         <div class="f-stat-num" id="stat-done">—</div>
@@ -528,7 +534,7 @@ function showHistoryByEmail() {
 
   document.getElementById('breadcrumb').innerHTML = '';
   document.getElementById('progress-bar').style.width = '100%';
-  document.getElementById('step-counter').textContent = 'Yêu cầu của tôi';
+  document.getElementById('step-counter').textContent = '';
   document.getElementById('step-label').textContent = state.user.name || email;
 
   const slot = document.getElementById('q-slot');
@@ -541,8 +547,8 @@ function showHistoryByEmail() {
 
   _loadHistory(email, slot);
 
-  // Hiện tiêu đề + thống kê trong header
-  const histTitle = document.getElementById('hist-header-title');
+  // Hiện context bar + thống kê trong header
+  const histTitle = document.getElementById('hist-context-bar');
   if (histTitle) histTitle.style.display = 'block';
   const statsEl = document.getElementById('f-stats');
   if (statsEl) statsEl.style.display = 'flex';
@@ -1643,21 +1649,21 @@ let _histAll = [];
 // ── Status metadata duy nhất — dùng chung cho _renderHistTable + renderTicketModal ──
 // key = giá trị SharePoint (cả có dấu lẫn không dấu) hoặc giá trị logic nội bộ
 const STATUS_META = {
-  'Cho tiep nhan':              { label:'Chờ tiếp nhận',    cls:'sb-new',     color:'#e8b300' },
-  'Chờ tiếp nhận':             { label:'Chờ tiếp nhận',    cls:'sb-new',     color:'#e8b300' },
+  'Cho tiep nhan':              { label:'Chờ xử lý',         cls:'sb-new',     color:'#e8b300' },
+  'Chờ tiếp nhận':             { label:'Chờ xử lý',         cls:'sb-new',     color:'#e8b300' },
   'Dang xu ly':                 { label:'Đang xử lý',       cls:'sb-active',  color:'#3b82f6' },
   'Đang xử lý':                { label:'Đang xử lý',       cls:'sb-active',  color:'#3b82f6' },
   'Hoan thanh':                 { label:'Đã hoàn thành',    cls:'sb-done',    color:'#22c55e' },
   'Hoàn thành':                { label:'Đã hoàn thành',    cls:'sb-done',    color:'#22c55e' },
   'Da hoan thanh':              { label:'Đã hoàn thành',    cls:'sb-done',    color:'#22c55e' },
   'Đã hoàn thành':             { label:'Đã hoàn thành',    cls:'sb-done',    color:'#22c55e' },
-  'Cho xac nhan quan ly':       { label:'Chờ xác nhận QL',  cls:'sb-pending', color:'#f97316' },
-  'Chờ xác nhận quản lý':      { label:'Chờ xác nhận QL',  cls:'sb-pending', color:'#f97316' },
+  'Cho xac nhan quan ly':       { label:'Chờ quản lý xác nhận', cls:'sb-pending', color:'#f97316' },
+  'Chờ xác nhận quản lý':      { label:'Chờ quản lý xác nhận', cls:'sb-pending', color:'#f97316' },
   'Tu choi':                    { label:'Từ chối',          cls:'sb-done',    color:'#ef4444' },
   'Từ chối':                   { label:'Từ chối',          cls:'sb-done',    color:'#ef4444' },
-  submitted:                    { label:'Đã tiếp nhận',     cls:'sb-new',     color:'#6b7280' },
+  submitted:                    { label:'Chờ xử lý',         cls:'sb-new',     color:'#e8b300' },
   in_progress:                  { label:'Đang xử lý',       cls:'sb-active',  color:'#3b82f6' },
-  pending_manager_confirmation: { label:'Chờ xác nhận',     cls:'sb-pending', color:'#f97316' },
+  pending_manager_confirmation: { label:'Chờ quản lý xác nhận', cls:'sb-pending', color:'#f97316' },
   resolved:                     { label:'Đã giải quyết',    cls:'sb-done',    color:'#22c55e' },
   closed:                       { label:'Đã đóng',          cls:'sb-done',    color:'#9ca3af' },
 };
@@ -1669,9 +1675,9 @@ const PRIO_META = {
 function _resolveStatus(raw) {
   const s = (raw||'').trim().toLowerCase();
   if (s.startsWith('dang') || s.startsWith('đang'))       return STATUS_META.in_progress;
-  if (s.startsWith('cho tiep') || s.startsWith('chờ tiếp')) return STATUS_META.submitted;
+  if (s.startsWith('cho tiep') || s.startsWith('chờ tiếp')) return STATUS_META['Cho tiep nhan'];
   if (s.startsWith('hoan') || s.startsWith('hoàn'))       return STATUS_META.resolved;
-  if (s.startsWith('cho xac') || s.startsWith('chờ xác')) return STATUS_META.pending_manager_confirmation;
+  if (s.startsWith('cho xac') || s.startsWith('chờ xác')) return STATUS_META['Cho xac nhan quan ly'];
   if (s.startsWith('tu choi') || s.startsWith('từ chối')) return STATUS_META['Tu choi'];
   return { label: raw || '', cls: 'sb-new', color: '#6b7280' };
 }
@@ -1682,31 +1688,32 @@ function renderHistory(tickets) {
   _updateUserStats();
 }
 
-// Tính 3 chỉ số theo đúng tickets của người dùng hiện tại
+// Tính 4 chỉ số theo đúng tickets của người dùng hiện tại
 function _updateUserStats() {
   const sl = s => (s || '').trim().toLowerCase();
   const IS_DONE = s =>
     s.startsWith('hoan') || s.startsWith('hoàn') || s.startsWith('đã hoàn') ||
     s === 'resolved' || s === 'closed' || s === 'da hoan thanh';
-  const IS_NEED_REPLY = s =>
+  const IS_ACTIVE = s =>
+    s.startsWith('dang') || s.startsWith('đang') || s === 'in_progress';
+  const IS_PENDING_MGR = s =>
     s.startsWith('cho xac') || s.startsWith('chờ xác') ||
-    s === 'pending_manager_confirmation' || s === 'can bo sung' || s.startsWith('cần bổ');
+    s === 'pending_manager_confirmation';
 
-  let open = 0, needReply = 0, done = 0;
+  let wait = 0, active = 0, pendingMgr = 0, done = 0;
   _histAll.forEach(t => {
     const s = sl(t.ticket_status);
-    if (IS_DONE(s)) {
-      done++;
-    } else {
-      open++;
-      if (IS_NEED_REPLY(s)) needReply++;
-    }
+    if      (IS_DONE(s))        done++;
+    else if (IS_ACTIVE(s))      active++;
+    else if (IS_PENDING_MGR(s)) pendingMgr++;
+    else                        wait++; // submitted / Chờ xử lý
   });
 
   const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
-  setEl('stat-wait',   open);
-  setEl('stat-active', needReply);
-  setEl('stat-done',   done);
+  setEl('stat-wait',    wait);
+  setEl('stat-active',  active);
+  setEl('stat-pending', pendingMgr);
+  setEl('stat-done',    done);
 }
 
 function _renderHistTable(list) {
@@ -1791,8 +1798,8 @@ function closeHistory() {
   // Hủy auto-refresh timer khi rời màn hình lịch sử
   if (_histRefreshTimer)  { clearInterval(_histRefreshTimer);  _histRefreshTimer  = null; }
   if (_statsRefreshTimer) { clearInterval(_statsRefreshTimer); _statsRefreshTimer = null; }
-  // Ẩn tiêu đề lịch sử + stats khi vào form
-  const histTitle = document.getElementById('hist-header-title');
+  // Ẩn context bar + stats khi vào form
+  const histTitle = document.getElementById('hist-context-bar');
   if (histTitle) histTitle.style.display = 'none';
   const statsEl = document.getElementById('f-stats');
   if (statsEl) statsEl.style.display = 'none';
