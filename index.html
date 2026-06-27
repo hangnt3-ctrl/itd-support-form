@@ -278,7 +278,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
     <div class="f-title">Cổng hỗ trợ CNTT</div>
   </div>
 
-  <div class="f-progress-wrap">
+  <div class="f-progress-wrap" id="f-progress-wrap">
     <div class="f-progress-bar" id="progress-bar" style="width:5%"></div>
     <div class="f-step-info" id="f-step-info">
       <span id="step-counter"></span>
@@ -601,6 +601,9 @@ function showHistoryByEmail() {
   document.getElementById('progress-bar').style.width = '100%';
   document.getElementById('step-counter').textContent = '';
   document.getElementById('step-label').textContent = state.user.name || email;
+  // Ẩn progress-wrap và breadcrumb khi xem lịch sử
+  document.getElementById('f-progress-wrap').style.display = 'none';
+  document.getElementById('breadcrumb').style.display = 'none';
 
   const slot = document.getElementById('q-slot');
   slot.innerHTML = `<div class="hist-loading"><span>⏳ Đang tải lịch sử yêu cầu...</span></div>`;
@@ -1997,6 +2000,9 @@ function closeHistory() {
   // Hủy auto-refresh timer khi rời màn hình lịch sử
   if (_histRefreshTimer)  { clearInterval(_histRefreshTimer);  _histRefreshTimer  = null; }
   if (_statsRefreshTimer) { clearInterval(_statsRefreshTimer); _statsRefreshTimer = null; }
+  // Khôi phục progress-wrap + breadcrumb
+  document.getElementById('f-progress-wrap').style.display = '';
+  document.getElementById('breadcrumb').style.display = '';
   // Khôi phục nav
   document.getElementById('f-nav').style.display = '';
   // Khôi phục nav chuẩn rồi render Q1 (lúc này state.user.name đã có → hiện form)
