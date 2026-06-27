@@ -134,7 +134,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinner{width:15px;height:15px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .75s linear infinite;flex-shrink:0}
 /* ── TOAST ── */
-.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:#1a1b2e;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:nowrap;max-width:90vw;text-align:center}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:#1a1b2e;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:normal;max-width:90vw;text-align:center;word-break:break-word}
 .toast.show{opacity:1;transform:translateX(-50%)}
 .toast.success{background:#15803d}
 .toast.error{background:#b91c1c}
@@ -305,7 +305,7 @@ const CONFIG = {
   MSAL_TENANT_ID: '010a6d4c-53ee-42a6-b68e-74c646a3297c', // Directory (tenant) ID
   // Redirect URI: URL trang này sau khi deploy lên GitHub Pages
   // VD: https://has-itd.github.io/itd-support/ITD_Support_Form.html
-  MSAL_REDIRECT_URI: window.location.href.split('?')[0],
+  MSAL_REDIRECT_URI: window.location.href.split('?')[0].split('#')[0],
 
   ORG_PREFIX: 'ITD',
   FORM_ID: 'service_support_registration',
@@ -346,13 +346,21 @@ async function getToken() {
 }
 
 // Helper: fetch với Bearer token (thay thế credentials:include)
-async function spFetch(url, opts={}) {
+async function spFetch(url, opts={}, signal) {
   const token = await getToken();
   const headers = Object.assign({
     'Accept': 'application/json;odata=verbose',
     'Authorization': 'Bearer ' + token,
   }, opts.headers || {});
-  return fetch(url, { ...opts, headers });
+  // Timeout 30s nếu không có signal riêng
+  const ctrl    = signal ? null : new AbortController();
+  const timer   = ctrl ? setTimeout(() => ctrl.abort(), 30000) : null;
+  const fetchSignal = signal || (ctrl && ctrl.signal);
+  try {
+    return await fetch(url, { ...opts, headers, signal: fetchSignal });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -578,6 +586,7 @@ function showHistoryByEmail() {
 
 // ── Auto-refresh lịch sử ─────────────────────────────────────
 let _histRefreshTimer = null;
+let _histFetchAbort  = null; // AbortController cho fetch đang chạy
 let _statsRefreshTimer = null;
 
 // ── Thống kê header (CHỜ / ĐANG XỬ LÝ / HOÀN THÀNH HÔM NAY) ─
@@ -667,15 +676,19 @@ async function _loadStatsFromMainList() {
 }
 
 function _loadHistory(email, slot) {
-  // Hủy timer cũ nếu có
+  // Hủy timer và fetch cũ nếu có
   if (_histRefreshTimer) { clearInterval(_histRefreshTimer); _histRefreshTimer = null; }
+  if (_histFetchAbort)   { _histFetchAbort.abort(); _histFetchAbort = null; }
 
   function doFetch(showLoading) {
     if (showLoading) {
       slot.innerHTML = `<div class="hist-loading"><span>⏳ Đang tải lịch sử yêu cầu...</span></div>`;
     }
-    fetchHistoryByEmail(email)
+    const ctrl = new AbortController();
+    _histFetchAbort = ctrl;
+    fetchHistoryByEmail(email, ctrl.signal)
       .then(tickets => {
+        if (ctrl.signal.aborted) return; // đã bị cancel — bỏ qua kết quả cũ
         renderHistory(tickets);
         // Cập nhật timestamp làm mới
         const ts = document.getElementById('hist-refresh-ts');
@@ -694,14 +707,14 @@ function _loadHistory(email, slot) {
 }
 
 // Fetch lịch sử theo submitter_email
-async function fetchHistoryByEmail(email) {
+async function fetchHistoryByEmail(email, signal) {
   const filter = encodeURIComponent("submitter_email eq '" + email.replace(/'/g,"''") + "'");
   const select = '$select=ticket_id,Title,TicketStatus,TicketPriority,submission_time,TicketTool,TicketGroup';
   const order  = '$orderby=submission_time desc';
   const top    = '$top=50';
   const url = CONFIG.SP_SITE + "/_api/lists/getByTitle('" + CONFIG.SP_LIST + "')/items?" +
               '$filter=' + filter + '&' + select + '&' + order + '&' + top;
-  const res = await spFetch(url);
+  const res = await spFetch(url, {}, signal);
   if (!res.ok) throw new Error('SharePoint: HTTP ' + res.status);
   const data = await res.json();
   return (data.d?.results || []).map(it => ({
@@ -852,7 +865,7 @@ function buildQHTML(q) {
         </div>
         <div class="f-field">
           <label>Lý do cần xác nhận</label>
-          <textarea id="mgr-reason" rows="4" placeholder="Mô tả lý do yêu cầu cần quản lý xác nhận..." style="width:100%;resize:vertical;font-family:inherit;font-size:14px;padding:10px 12px;border:1.5px solid #e2e4ef;border-radius:8px;box-sizing:border-box;outline:none" oninput="onMgrInput()">${esc(m.manager_reason||'')}</textarea>
+          <textarea id="mgr-reason" rows="4" class="f-textarea" placeholder="Mô tả lý do yêu cầu cần quản lý xác nhận..." oninput="onMgrInput()">${esc(m.manager_reason||'')}</textarea>
         </div>
       </div>`;
       break;
@@ -969,14 +982,17 @@ function onMgrInput() {
   const reason = (document.getElementById('mgr-reason')||{}).value||'';
   // Validate: cấp 1 phải có ít nhất 1 email hợp lệ
   const emails1 = raw1.split(';').map(e=>e.trim().toLowerCase()).filter(Boolean);
+  const emails2 = raw2.split(';').map(e=>e.trim().toLowerCase()).filter(Boolean);
   const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
   const level1ok = emails1.length > 0 && emails1.every(validEmail);
+  const level2ok = emails2.length === 0 || emails2.every(validEmail); // cấp 2 không bắt buộc nhưng nếu nhập phải hợp lệ
   state.answers['Q5'] = {
     manager_email_1: emails1.join('; '),
-    manager_email_2: raw2.split(';').map(e=>e.trim().toLowerCase()).filter(Boolean).join('; '),
+    manager_email_2: emails2.join('; '),
     manager_reason:  reason.trim(),
   };
-  setNextEnabled(level1ok);
+  if (level1ok && !level2ok) showToast('Email quản lý cấp 2 không hợp lệ', 'warn');
+  setNextEnabled(level1ok && level2ok);
 }
 
 // ── User info form ──────────────────────────────────────────
@@ -1016,7 +1032,8 @@ function addFiles(files) {
   files.forEach(f => {
     if (state.files.length >= q.maxFiles) { showToast('Tối đa '+q.maxFiles+' file','error'); return; }
     if (f.size > q.maxSizeMB*1024*1024) { showToast(f.name+': vượt quá '+q.maxSizeMB+'MB','error'); return; }
-    if (!state.files.find(x => x.name===f.name)) state.files.push(f);
+    if (state.files.find(x => x.name===f.name)) { showToast(f.name + ': đã có trong danh sách', 'warn'); }
+    else state.files.push(f);
   });
   document.getElementById('file-list').innerHTML = renderFileList();
   setNextEnabled(true); // optional field, always allow next
@@ -1059,6 +1076,15 @@ function goNext() {
 }
 
 function editFromConfirm(qId) {
+  // Clear history từ qId trở đi và xóa answers tương ứng để tránh data mâu thuẫn
+  const idx = state.history.indexOf(qId);
+  if (idx !== -1) {
+    const removed = state.history.splice(idx); // cắt từ qId đến cuối
+    removed.forEach(id => { delete state.answers[id]; });
+  } else {
+    // qId chưa trong history (chưa từng đi qua) — vẫn clear answers nếu có
+    delete state.answers[qId];
+  }
   state._editMode = true;
   renderQ(qId);
 }
@@ -1066,6 +1092,8 @@ function editFromConfirm(qId) {
 function goBack() {
   if (!state.history.length) return;
   const prev = state.history.pop();
+  // Xóa answer câu hiện tại để tránh data cũ khi đổi hướng flow
+  delete state.answers[state.currentQ];
   renderQ(prev);
 }
 
@@ -1224,7 +1252,7 @@ function buildPayload() {
   const _dd  = String(_now.getDate()).padStart(2,'0');
   const _mm  = String(_now.getMonth()+1).padStart(2,'0');
   const _yy  = String(_now.getFullYear()).slice(-2);
-  const _seq = String(Date.now() % 100000).padStart(5,'0');
+  const _seq = Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
   const ticketId = CONFIG.ORG_PREFIX + '-' + _dd + _mm + _yy + '-' + _seq;
   const q1ans   = state.answers['Q1'] || {};
   const q2ans   = state.answers['Q2'] || {};
@@ -1387,7 +1415,7 @@ async function sendSP(payload) {
       const ext = n.lastIndexOf('.') > 0 ? n.slice(n.lastIndexOf('.')) : '';
       const base = n.slice(0, n.length - ext.length);
       const ascii = base
-        .normalize('NFD').replace(/[̀-ͯ]/g, '')  // bỏ dấu
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // bỏ dấu
         .replace(/[đĐ]/g, 'd')
         .replace(/[~"#%&*:<>?\\/{}|'\s]/g, '_')
         .replace(/_+/g, '_').trim() || ('file_' + Date.now());
@@ -1448,7 +1476,7 @@ async function sendViaFlow(payload) {
     const ext = n.lastIndexOf('.') > 0 ? n.slice(n.lastIndexOf('.')) : '';
     const base = n.slice(0, n.length - ext.length);
     const ascii = base
-      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[đĐ]/g, 'd')
       .replace(/[~"#%&*:<>?\/{}|'\s]/g, '_')
       .replace(/_+/g, '_').trim() || ('file_' + Date.now());
@@ -1496,11 +1524,21 @@ async function sendGAS(payload) {
   if (!CONFIG.GOOGLE_SCRIPT_URL || CONFIG.GOOGLE_SCRIPT_URL.startsWith('REPLACE')) {
     throw new Error('Chưa cấu hình GOOGLE_SCRIPT_URL trong CONFIG');
   }
-  await fetch(CONFIG.GOOGLE_SCRIPT_URL, {
-    method:'POST', headers:{'Content-Type':'text/plain'},
-    body: JSON.stringify(payload),
-  });
-  // GAS no-cors → treat as success
+  let res;
+  try {
+    res = await fetch(CONFIG.GOOGLE_SCRIPT_URL, {
+      method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify(payload),
+    });
+  } catch(e) {
+    throw new Error('Không thể kết nối Google Script: ' + (e.message||e));
+  }
+  // no-cors trả về opaque response (res.ok === false, status === 0) — không thể đọc body
+  // Nếu fetch không throw → đã gửi được; log warning để debug nếu cần
+  if (res && res.type === 'error') {
+    throw new Error('Google Script trả về lỗi. Kiểm tra GAS deployment và URL.');
+  }
+  console.log('[ITD] sendGAS: request sent (no-cors, response opaque)');
 }
 
 // ╔══════════════════════════════════════════════════════════╗
@@ -1596,8 +1634,11 @@ function updateBreadcrumb() {
       case 'choice_list':
       case 'impact':
         label = ans.label; break;
-      case 'long_text':
-        label = (ans.value||'').substring(0,30)+'…'; break;
+      case 'long_text': {
+        const v = (ans.value||'');
+        label = v.length > 30 ? v.substring(0,30)+'…' : v;
+        break;
+      }
       default:
         label = q.badge;
     }
@@ -1904,8 +1945,12 @@ function closeHistory() {
 // ╔══════════════════════════════════════════════════════════╗
 // ║  TICKET DETAIL MODAL                                     ║
 // ╚══════════════════════════════════════════════════════════╝
+let _viewTicketLoading = false; // chống double-click mở nhiều modal
 async function viewTicket(ticketId) {
-  if (!ticketId) return;
+  if (!ticketId || _viewTicketLoading) return;
+  _viewTicketLoading = true;
+  // Disable tất cả nút action trong bảng
+  document.querySelectorAll('.btn-xem,.btn-track,.btn-confirm,.btn-rate').forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
   // Tạo overlay loading trước
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -1947,6 +1992,8 @@ async function viewTicket(ticketId) {
 
     renderTicketModal(item, fullData, spAttachments);
   } catch(e) {
+    _viewTicketLoading = false;
+    document.querySelectorAll('.btn-xem,.btn-track,.btn-confirm,.btn-rate').forEach(b => { b.disabled = false; b.style.opacity = ''; });
     overlay.querySelector('.modal-card').innerHTML = `
       <div class="modal-head">
         <span class="modal-head-id">${esc(ticketId)}</span>
@@ -2068,6 +2115,8 @@ function renderTicketModal(item, fullData, spAttachments=[]) {
 function closeModal() {
   const m = document.getElementById('ticket-modal');
   if (m) m.remove();
+  _viewTicketLoading = false;
+  document.querySelectorAll('.btn-xem,.btn-track,.btn-confirm,.btn-rate').forEach(b => { b.disabled = false; b.style.opacity = ''; });
 }
 
 // ── Generic helpers ─────────────────────────────────────────
@@ -2079,7 +2128,7 @@ function showToast(msg, type='') {
   clearTimeout(_tt);
   _tt = setTimeout(()=>t.classList.remove('show'), 3500);
 }
-function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 // escAttr: dùng riêng cho giá trị trong HTML attribute (data-*, href, value...)
 // Escape thêm single-quote phòng trường hợp attribute không wrap bằng dấu "
 function escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
@@ -2197,33 +2246,4 @@ _resizeObs.observe(document.body);
 ║      'ManagerName','ManagerEmail','ManagerDept',             ║
 ║      'Attachments','SubmittedAt'                             ║
 ║    ]);                                                        ║
-║    const a = d.answers||{};                                  ║
-║    const s = d.system_fields||{};                            ║
-║    const sb = d.submitted_by||{};                            ║
-║    sh.appendRow([                                            ║
-║      s.ticket_id, s.ticket_title,                            ║
-║      sb.full_name, sb.email, sb.department,                  ║
-║      (a.support_need_group||{}).label||'',                   ║
-║      (a.account_login_issue_type||a.permission_request_type||{}).label||'',║
-║      (a.support_tool||{}).label||'',                         ║
-║      (a.requested_account_features||{}).value||'',           ║
-║      JSON.stringify(a.direct_user_info||{}),                 ║
-║      (a.request_description||{}).value||'',                  ║
-║      (a.impact_scope||{}).label||'',                         ║
-║      s.priority, s.sla, s.ticket_status,                     ║
-║      (a.manager_confirmation_info||{}).manager_name||'',     ║
-║      (a.manager_confirmation_info||{}).manager_email||'',    ║
-║      (a.manager_confirmation_info||{}).manager_department||'',║
-║      JSON.stringify(a.attachments||[]),                      ║
-║      d.submitted_at                                          ║
-║    ]);                                                        ║
-║    return ContentService                                      ║
-║      .createTextOutput(JSON.stringify({ok:true,id:s.ticket_id}))║
-║      .setMimeType(ContentService.MimeType.JSON);             ║
-║  }                                                            ║
-║                                                              ║
-║  3. Deploy → Web App → Execute as: Me                        ║
-║     Who has access: Anyone (hoặc Anyone with Google account) ║
-║  4. Copy URL → CONFIG.GOOGLE_SCRIPT_URL                      ║
-║  5. CONFIG.BACKEND = 'googlesheet'                           ║
-╚═══════════════════════════════════════
+║    const a = d.answers||{};          
