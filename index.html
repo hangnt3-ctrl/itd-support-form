@@ -9,8 +9,8 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* Khi nhúng vào SharePoint iframe: loại bỏ padding thừa, co giãn toàn chiều rộng */
-html{min-height:100%}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#eef0f8;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px 8px}
+html{min-height:100%;overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#eef0f8;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px 8px;overflow-x:hidden}
 /* ── CARD ── */
 .f-card{background:#fff;border-radius:18px;box-shadow:0 6px 32px rgba(98,100,167,.14);width:100%;max-width:680px;overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 32px)}
 /* ── HEADER ── */
@@ -234,23 +234,68 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .hist-stats-card .f-stat-item+.f-stat-item{border-left:1px solid #eef0f8}
 .hist-stats-card .f-stat-num{font-size:20px;font-weight:800;line-height:1.1;letter-spacing:-1px;color:#1a1b2e}
 .hist-stats-card .f-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.2px;color:#8a90a8;margin-top:4px;white-space:nowrap;opacity:1}
-@media(max-width:768px){
+@media(max-width:640px){
+  /* Card: edge-to-edge trên mobile */
+  body{padding:0}
+  .f-card{border-radius:0;max-height:100vh;max-height:100dvh;max-width:100%}
+
+  /* Header */
+  .f-header{padding:12px 18px}
+  .f-title{font-size:15px}
+  .f-logo{letter-spacing:1.5px}
+
+  /* hist-wrap: f-body vẫn padding:22px 28px 8px → giữ nguyên cancel margin */
   .hist-wrap{margin:-22px -28px -8px}
-  .hist-greeting{padding:20px 20px 16px}
-  .hist-panel{margin:0 12px 20px;padding:18px 16px}
-  .hist-topbar{gap:10px}
-  .hist-search-wrap{min-width:100%;flex:unset;width:100%}
-  .btn-refresh-sm,.btn-new-top{flex:1;justify-content:center}
+
+  /* Greeting */
+  .hist-greeting{padding:16px 20px 12px}
+  .hist-greeting-name{font-size:15px;overflow-wrap:break-word;word-break:break-word}
+  .hist-greeting-sub{font-size:11px;white-space:normal;overflow-wrap:break-word}
+
+  /* Stats card */
+  .hist-stats-card{margin:0 14px 12px;padding:14px 14px 10px;border-radius:14px}
+  .hist-stats-hdr{flex-direction:column;align-items:flex-start;gap:2px;margin-bottom:10px}
+  .hist-stats-hint{font-size:10px}
+
+  /* Stats: 2 cột trên mobile thay vì 5 cột ngang */
+  .hist-stats-card .f-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;border-top:1px solid #eef0f8;padding-top:10px}
+  .hist-stats-card .f-stat-item{border-radius:10px;padding:10px 8px;border-left:none !important}
+  .hist-stats-card .f-stat-num{font-size:18px}
+  .hist-stats-card .f-stat-lbl{white-space:normal;font-size:9.5px;line-height:1.3}
+
+  /* Panel */
+  .hist-panel{margin:0 14px 20px;padding:16px 16px;border-radius:14px}
+
+  /* Toolbar: search full-width, nút thao tác thành hàng 2-cột bên dưới */
+  .hist-topbar{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:16px}
+  .hist-search-wrap{min-width:0;width:100%;flex:unset}
+  .hist-topbar-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btn-refresh-sm{display:inline-flex !important;justify-content:center;width:100%;height:38px;font-size:12px;flex:unset}
+  .btn-new-top{justify-content:center;width:100%;height:38px;font-size:12px;flex:unset}
+
+  /* Table: ẩn header, rows dạng card */
   .hist-thead{display:none}
-  .hist-tr{display:flex;flex-direction:column;align-items:stretch;padding:14px 16px;min-height:auto;gap:0;border-bottom:1px solid #f2f4f9}
-  .hist-tr-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
-  .hist-tr-row2{font-size:13px;color:#1a1b2e;font-weight:500;line-height:1.45;margin-bottom:4px}
-  .hist-tr-row3{font-size:10px;color:#b0b5c8;font-family:monospace}
+  .hist-tr{display:flex;flex-direction:column;align-items:stretch;padding:14px 14px;min-height:auto;gap:0;border-bottom:1px solid #f2f4f9}
+  .hist-tr:last-child{border:none}
+  /* Tool badge */
+  .hist-tr>div:nth-child(1){margin-bottom:8px}
+  /* Title + ID */
+  .hist-tr>div:nth-child(2){margin-bottom:6px}
+  /* Date */
+  .hist-tr>div:nth-child(3){margin-bottom:12px;white-space:normal}
+  /* Action: stretch full width */
+  .hist-td-act{justify-content:stretch}
+  .btn-xem,.btn-track,.btn-confirm,.btn-rate{width:100%;justify-content:center;height:40px;font-size:13px;border-radius:10px}
+  .tool-badge{max-width:100%}
+  .hist-td-title{font-size:13px}
+
+  /* Table-wrap: remove side borders on mobile for cleaner look */
+  .hist-table-wrap{border-left:none;border-right:none;border-radius:10px}
 }
-@media(max-width:480px){
-  .hist-wrap{margin:-22px -20px -8px}
-  .hist-greeting{padding:18px 18px 14px}
-  .hist-panel{margin:0 10px 16px;padding:16px 14px}
+@media(max-width:390px){
+  .hist-stats-card{margin:0 10px 10px}
+  .hist-panel{margin:0 10px 16px}
+  .hist-stats-card .f-stat-num{font-size:16px}
 }
 
 /* ── Ticket detail modal ── */
@@ -1973,8 +2018,10 @@ function _renderHistTable(list) {
             oncompositionstart="this._composing=true"
             oncompositionend="this._composing=false; filterHist(this.value)">
         </div>
-        <button class="btn-refresh-sm" style="display:inline-flex" onclick="showHistoryByEmail()" title="Cập nhật danh sách">🔄 Cập nhật</button>
-        <button class="btn-new-top" onclick="closeHistory()">✏️ Gửi yêu cầu mới</button>
+        <div class="hist-topbar-btns">
+          <button class="btn-refresh-sm" style="display:inline-flex" onclick="showHistoryByEmail()" title="Cập nhật danh sách">🔄 Cập nhật</button>
+          <button class="btn-new-top" onclick="closeHistory()">✏️ Gửi yêu cầu mới</button>
+        </div>
       </div>
       <div class="hist-info-bar">
         <div class="hist-section-title">Danh sách yêu cầu đã gửi</div>
