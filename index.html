@@ -182,11 +182,11 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .hist-table-wrap{border:1px solid #e8eaf2;border-radius:14px;overflow:hidden}
 
 /* Table header */
-.hist-thead{display:grid;grid-template-columns:1fr 130px 100px 110px;background:#f7f8fc;border-bottom:1px solid #eceef8;padding:11px 20px;font-size:10px;font-weight:700;color:#9aa0b8;letter-spacing:.7px;text-transform:uppercase;gap:12px}
+.hist-thead{display:grid;grid-template-columns:160px 1fr 100px 108px;background:#f7f8fc;border-bottom:1px solid #eceef8;padding:11px 20px;font-size:10px;font-weight:700;color:#9aa0b8;letter-spacing:.7px;text-transform:uppercase;gap:12px}
 
 /* Table body */
 .hist-tbody{}
-.hist-tr{display:grid;grid-template-columns:1fr 130px 100px 110px;padding:16px 20px;border-bottom:1px solid #f2f4f9;gap:12px;align-items:center;transition:background .12s;min-height:68px}
+.hist-tr{display:grid;grid-template-columns:160px 1fr 100px 108px;padding:16px 20px;border-bottom:1px solid #f2f4f9;gap:12px;align-items:center;transition:background .12s;min-height:68px}
 .hist-tr:last-child{border:none}
 .hist-tr:hover{background:#f8f9fe}
 
@@ -221,6 +221,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .btn-rate:hover{background:#faf5ff}
 
 /* Responsive */
+.tool-badge{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;color:#3b4a6b;background:#eef1fb;border-radius:7px;padding:4px 10px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.tool-empty{font-size:11px;color:#c0c5d8;font-style:italic}
 @media(max-width:768px){
   .hist-wrap{margin:-22px -28px -8px}
   .hist-greeting{padding:20px 20px 16px}
@@ -229,9 +231,10 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   .hist-search-wrap{min-width:100%;flex:unset;width:100%}
   .btn-refresh-sm,.btn-new-top{flex:1;justify-content:center}
   .hist-thead{display:none}
-  .hist-tr{grid-template-columns:1fr auto;grid-template-rows:auto auto;padding:14px 16px;min-height:auto;gap:8px}
-  .hist-tr>div:nth-child(3){display:none}
-  .hist-tr>div:nth-child(4){grid-column:2;grid-row:1/3;display:flex;align-items:center}
+  .hist-tr{display:flex;flex-direction:column;align-items:stretch;padding:14px 16px;min-height:auto;gap:0;border-bottom:1px solid #f2f4f9}
+  .hist-tr-row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .hist-tr-row2{font-size:13px;color:#1a1b2e;font-weight:500;line-height:1.45;margin-bottom:4px}
+  .hist-tr-row3{font-size:10px;color:#b0b5c8;font-family:monospace}
 }
 @media(max-width:480px){
   .hist-wrap{margin:-22px -20px -8px}
@@ -1859,14 +1862,25 @@ function _renderHistTable(list) {
   const count = list.length;
 
   // Bỏ tên người gửi khỏi tiêu đề (suffix " - {tên}") vì user đang xem yêu cầu của chính mình
-  function cleanTitle(raw) {
+  function cleanIssue(raw) {
     if (!raw) return '(Không có tiêu đề)';
+    // Trích phần trong ngoặc đầu tiên: [Loại yêu cầu] - [Công cụ] - Tên
+    const m = raw.match(/^\[([^\]]+)\]/);
+    if (m) return m[1];
+    // Fallback: bỏ tên user ở cuối
     const name = state.user.name;
     if (name) {
       const suffix = ' - ' + name;
-      if (raw.endsWith(suffix)) return raw.slice(0, -suffix.length).trim();
+      if (raw.endsWith(suffix)) raw = raw.slice(0, -suffix.length).trim();
     }
-    return raw;
+    // Bỏ [Tool] nếu còn sót
+    raw = raw.replace(/\s*-\s*\[[^\]]*\]\s*$/, '').trim();
+    return raw || '(Không có tiêu đề)';
+  }
+  function extractTool(raw) {
+    // Trích [Công cụ] từ dạng [Loại] - [Công cụ] - Tên
+    const m = raw.match(/^\[[^\]]+\]\s*-\s*\[([^\]]+)\]/);
+    return m ? m[1] : '';
   }
 
   // Helper: nhãn ưu tiên thân thiện
@@ -1898,23 +1912,24 @@ function _renderHistTable(list) {
       const date = t.submitted_at
         ? new Date(t.submitted_at).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'})
         : '';
-      const sm   = STATUS_META[t.ticket_status] || _resolveStatus(t.ticket_status);
-      const sCls = sm.cls;
-      const sLbl = sm.label;
-      const title = cleanTitle(t.ticket_title);
+      const issue = cleanIssue(t.ticket_title);
+      const tool  = esc(t.support_tool || extractTool(t.ticket_title || ''));
+      const toolHtml = tool
+        ? `<span class="tool-badge">${tool}</span>`
+        : `<span class="tool-empty">—</span>`;
       rows += `<div class="hist-tr">
+        <div>${toolHtml}</div>
         <div>
-          <div class="hist-td-title">${esc(title)}</div>
+          <div class="hist-td-title">${esc(issue)}</div>
           <div class="hist-td-sub">${esc(t.ticket_id||'')}</div>
         </div>
-        <div><span class="sbadge ${sCls}">${esc(sLbl)}</span></div>
-        <div style="font-size:11px;color:#888;white-space:nowrap">${date}</div>
+        <div style="font-size:11px;color:#8a90a8;white-space:nowrap">${date}</div>
         <div class="hist-td-act">${actionBtn(t.ticket_status, t.ticket_id)}</div>
       </div>`;
     });
     rows = `<div class="hist-table-wrap">
       <div class="hist-thead">
-        <div>Nội dung yêu cầu</div><div>Tình trạng</div><div>Ngày tạo</div><div>Thao tác</div>
+        <div>Công cụ</div><div>Nội dung yêu cầu</div><div>Ngày tạo</div><div>Thao tác</div>
       </div>
       <div class="hist-tbody">${rows}</div>
     </div>`;
