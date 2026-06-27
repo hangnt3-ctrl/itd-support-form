@@ -223,6 +223,17 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 /* Responsive */
 .tool-badge{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;color:#3b4a6b;background:#eef1fb;border-radius:7px;padding:4px 10px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
 .tool-empty{font-size:11px;color:#c0c5d8;font-style:italic}
+.hist-stats-card{background:#fff;border-radius:16px;margin:0 20px 16px;padding:18px 20px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.05)}
+.hist-stats-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.hist-stats-title{font-size:13px;font-weight:700;color:#1a1b2e}
+.hist-stats-hint{font-size:11px;color:#9aa0b8}
+.hist-stats-card .f-stats{display:flex;gap:0;border-top:1px solid #eef0f8;padding-top:10px;margin-top:0}
+.hist-stats-card .f-stat-item{flex:1;text-align:center;padding:8px 4px;border-radius:10px;cursor:pointer;transition:background .15s,box-shadow .15s;box-sizing:border-box;box-shadow:inset 0 0 0 1.5px transparent}
+.hist-stats-card .f-stat-item:hover{background:rgba(98,100,167,.07)}
+.hist-stats-card .f-stat-item.active-filter{background:rgba(98,100,167,.09);box-shadow:inset 0 0 0 1.5px rgba(98,100,167,.38)}
+.hist-stats-card .f-stat-item+.f-stat-item{border-left:1px solid #eef0f8}
+.hist-stats-card .f-stat-num{font-size:20px;font-weight:800;line-height:1.1;letter-spacing:-1px;color:#1a1b2e}
+.hist-stats-card .f-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.2px;color:#8a90a8;margin-top:4px;white-space:nowrap;opacity:1}
 @media(max-width:768px){
   .hist-wrap{margin:-22px -28px -8px}
   .hist-greeting{padding:20px 20px 16px}
@@ -265,32 +276,6 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
   <div class="f-header">
     <div class="f-logo">Phòng Công nghệ Thông tin</div>
     <div class="f-title">Cổng hỗ trợ CNTT</div>
-    <div id="hist-context-bar" style="display:none;margin:10px -28px -20px;padding:8px 28px;background:rgba(255,255,255,.12);border-top:1px solid rgba(255,255,255,.15)">
-      <span style="font-size:13px;font-weight:700;color:#fff;letter-spacing:.3px">Tình trạng yêu cầu của bạn</span>
-      <span style="font-size:10px;opacity:.65;margin-left:6px;font-weight:400">Nhấn vào từng ô để lọc danh sách bên dưới</span>
-    </div>
-    <div class="f-stats" id="f-stats" style="display:none">
-      <div class="f-stat-item" onclick="filterByStatCat('all')" id="si-all">
-        <div class="f-stat-num" id="stat-all">—</div>
-        <div class="f-stat-lbl">Tất cả ›</div>
-      </div>
-      <div class="f-stat-item" onclick="filterByStatCat('wait')" id="si-wait">
-        <div class="f-stat-num" id="stat-wait">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Chờ xử lý ›</div>
-      </div>
-      <div class="f-stat-item" onclick="filterByStatCat('active')" id="si-active">
-        <div class="f-stat-num" id="stat-active">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Đang xử lý ›</div>
-      </div>
-      <div class="f-stat-item" onclick="filterByStatCat('pending')" id="si-pending">
-        <div class="f-stat-num" id="stat-pending">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot" style="color:#f97316">●</span>Chờ xác nhận ›</div>
-      </div>
-      <div class="f-stat-item" onclick="filterByStatCat('done')" id="si-done">
-        <div class="f-stat-num" id="stat-done">—</div>
-        <div class="f-stat-lbl"><span class="stat-dot dot-done">●</span>Đã xử lý xong ›</div>
-      </div>
-    </div>
   </div>
 
   <div class="f-progress-wrap">
@@ -629,11 +614,6 @@ function showHistoryByEmail() {
 
   _loadHistory(email, slot);
 
-  // Hiện context bar + thống kê trong header
-  const histTitle = document.getElementById('hist-context-bar');
-  if (histTitle) histTitle.style.display = 'block';
-  const statsEl = document.getElementById('f-stats');
-  if (statsEl) statsEl.style.display = 'flex';
 }
 
 // ── Auto-refresh lịch sử ─────────────────────────────────────
@@ -1952,6 +1932,34 @@ function _renderHistTable(list) {
       <div class="hist-greeting-name">${greetName}</div>
       <div class="hist-greeting-sub">Theo dõi tiến độ xử lý các yêu cầu hỗ trợ CNTT của bạn.</div>
     </div>
+    <div class="hist-stats-card">
+      <div class="hist-stats-hdr">
+        <span class="hist-stats-title">Tình trạng yêu cầu của bạn</span>
+        <span class="hist-stats-hint">Nhấn vào từng ô để lọc danh sách bên dưới</span>
+      </div>
+      <div class="f-stats" id="f-stats">
+        <div class="f-stat-item" onclick="filterByStatCat('all')" id="si-all">
+          <div class="f-stat-num" id="stat-all">—</div>
+          <div class="f-stat-lbl">Tất cả ›</div>
+        </div>
+        <div class="f-stat-item" onclick="filterByStatCat('wait')" id="si-wait">
+          <div class="f-stat-num" id="stat-wait">—</div>
+          <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Chờ xử lý ›</div>
+        </div>
+        <div class="f-stat-item" onclick="filterByStatCat('active')" id="si-active">
+          <div class="f-stat-num" id="stat-active">—</div>
+          <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Đang xử lý ›</div>
+        </div>
+        <div class="f-stat-item" onclick="filterByStatCat('pending')" id="si-pending">
+          <div class="f-stat-num" id="stat-pending">—</div>
+          <div class="f-stat-lbl"><span class="stat-dot" style="color:#f97316">●</span>Chờ xác nhận ›</div>
+        </div>
+        <div class="f-stat-item" onclick="filterByStatCat('done')" id="si-done">
+          <div class="f-stat-num" id="stat-done">—</div>
+          <div class="f-stat-lbl"><span class="stat-dot dot-done">●</span>Đã xử lý xong ›</div>
+        </div>
+      </div>
+    </div>
     <div class="hist-panel">
       <div class="hist-topbar">
         <div class="hist-search-wrap">
@@ -1989,11 +1997,6 @@ function closeHistory() {
   // Hủy auto-refresh timer khi rời màn hình lịch sử
   if (_histRefreshTimer)  { clearInterval(_histRefreshTimer);  _histRefreshTimer  = null; }
   if (_statsRefreshTimer) { clearInterval(_statsRefreshTimer); _statsRefreshTimer = null; }
-  // Ẩn context bar + stats khi vào form
-  const histTitle = document.getElementById('hist-context-bar');
-  if (histTitle) histTitle.style.display = 'none';
-  const statsEl = document.getElementById('f-stats');
-  if (statsEl) statsEl.style.display = 'none';
   // Khôi phục nav
   document.getElementById('f-nav').style.display = '';
   // Khôi phục nav chuẩn rồi render Q1 (lúc này state.user.name đã có → hiện form)
