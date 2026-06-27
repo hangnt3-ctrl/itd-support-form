@@ -147,34 +147,61 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .hist-link:hover{color:#3a3cbf}
 /* ── History screen ── */
 @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
-.hist-wrap{margin:-8px 0;padding:20px 20px 24px}
-.hist-topbar{display:flex;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap}
-.hist-search-wrap{display:flex;align-items:center;background:#fff;border:1.5px solid #e0e3f0;border-radius:9px;overflow:hidden;flex:1;min-width:200px;height:36px}
-.hist-search-wrap:focus-within{border-color:#6264a7;box-shadow:0 0 0 3px rgba(98,100,167,.08)}
-.hist-search-wrap svg{margin-left:12px;flex-shrink:0;color:#bbb}
-.hist-search{border:none;outline:none;padding:0 12px;font-size:13px;width:100%;font-family:inherit;color:#333;height:100%}
+
+/* Outer shell: full-bleed light background, cancel f-body padding */
+.hist-wrap{margin:-22px -28px -8px;padding:0;background:#f0f2f8;min-height:calc(100% + 30px);display:flex;flex-direction:column}
+
+/* Greeting: sits on the background */
+.hist-greeting{padding:24px 28px 20px;border-bottom:none;flex-shrink:0}
+.hist-greeting-name{font-size:16px;font-weight:700;color:#1a1b2e;margin-bottom:4px}
+.hist-greeting-sub{font-size:12px;color:#8a90a8;line-height:1.6}
+
+/* White panel card */
+.hist-panel{background:#fff;border-radius:18px;margin:0 20px 28px;padding:24px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.05);flex:1}
+
+/* Toolbar: 40px controls, consistent height */
+.hist-topbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.hist-search-wrap{display:flex;align-items:center;background:#f7f8fc;border:1.5px solid #e4e6f0;border-radius:10px;overflow:hidden;flex:1;min-width:240px;height:40px;transition:border .15s,box-shadow .15s}
+.hist-search-wrap:focus-within{background:#fff;border-color:#6264a7;box-shadow:0 0 0 3px rgba(98,100,167,.1)}
+.hist-search-wrap svg{margin-left:14px;flex-shrink:0;color:#aab}
+.hist-search{border:none;outline:none;padding:0 12px;font-size:13px;width:100%;font-family:inherit;color:#333;height:100%;background:transparent}
 .hist-count{font-size:12px;color:#888;white-space:nowrap;margin-left:auto}
-.hist-table-wrap{border:1px solid #e8eaf2;border-radius:14px;overflow:hidden;margin-top:16px}
-.hist-thead{display:grid;grid-template-columns:1fr 120px 96px 100px;background:#f8f9fc;border-bottom:1px solid #eceef5;padding:10px 24px;font-size:10.5px;font-weight:700;color:#9aa0b5;letter-spacing:.5px;text-transform:uppercase;gap:12px}
+
+/* Buttons: same 40px height */
+.btn-refresh-sm{font-size:12px;font-weight:600;padding:0 16px;height:40px;border-radius:10px;border:1.5px solid #e4e6f0;background:#fff;color:#6264a7;cursor:pointer;white-space:nowrap;display:none;align-items:center;gap:6px;transition:all .15s;flex-shrink:0}
+.btn-refresh-sm:hover{background:#f4f4fc;border-color:#b8badf}
+.btn-new-top{font-size:12px;font-weight:700;padding:0 18px;height:40px;border-radius:10px;border:none;background:#6264a7;color:#fff;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:background .15s;flex-shrink:0}
+.btn-new-top:hover{background:#5052a0}
+
+/* Section info */
+.hist-info-bar{display:flex;align-items:center;justify-content:space-between;margin:0 0 16px;flex-wrap:wrap;gap:6px}
+.hist-section-title{font-size:13px;font-weight:700;color:#1a1b2e}
+.hist-refresh-info{font-size:11px;color:#b0b5c8}
+
+/* Table container */
+.hist-table-wrap{border:1px solid #e8eaf2;border-radius:14px;overflow:hidden}
+
+/* Table header */
+.hist-thead{display:grid;grid-template-columns:1fr 130px 100px 110px;background:#f7f8fc;border-bottom:1px solid #eceef8;padding:11px 20px;font-size:10px;font-weight:700;color:#9aa0b8;letter-spacing:.7px;text-transform:uppercase;gap:12px}
+
+/* Table body */
 .hist-tbody{}
-.hist-tr{display:grid;grid-template-columns:1fr 120px 96px 100px;padding:14px 24px;border-bottom:1px solid #f2f4f9;gap:12px;align-items:center;transition:background .1s;min-height:64px}
+.hist-tr{display:grid;grid-template-columns:1fr 130px 100px 110px;padding:16px 20px;border-bottom:1px solid #f2f4f9;gap:12px;align-items:center;transition:background .12s;min-height:68px}
 .hist-tr:last-child{border:none}
-.hist-tr:hover{background:#f9fafe}
-@media(max-width:640px){
-  .hist-wrap{padding:14px 14px 20px}
-  .hist-topbar{gap:8px}
-  .hist-search-wrap{min-width:100%;order:1}
-  .btn-refresh-sm,.btn-new-top{font-size:11px}
-  .hist-thead{display:none}
-  .hist-tr{grid-template-columns:1fr auto;grid-template-rows:auto auto;padding:12px 16px;min-height:auto;gap:6px}
-  .hist-tr>div:nth-child(3){display:none}
-  .hist-tr>div:nth-child(4){grid-column:2;grid-row:1/3;display:flex;align-items:center}
-}
+.hist-tr:hover{background:#f8f9fe}
+
+/* Table cells */
 .hist-td-id{font-size:12px;font-weight:700;color:#1a4fa0;cursor:default;font-variant-numeric:tabular-nums;word-break:break-all}
 .hist-td-title{font-size:13px;color:#1a1b2e;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
 .hist-td-date{font-size:11px;color:#888;white-space:nowrap}
-.hist-td-act{display:flex;justify-content:flex-end;padding-right:4px}
-.sbadge{display:inline-flex;align-items:center;font-size:10px;font-weight:600;padding:3px 8px;border-radius:20px;white-space:nowrap}
+.hist-td-act{display:flex;justify-content:flex-end;padding-right:2px}
+.hist-td-sub{font-size:10px;color:#b0b5c8;margin-top:2px;font-family:monospace}
+.hist-empty{text-align:center;padding:52px 20px;color:#b0b5c8;font-size:13px}
+.hist-loading{text-align:center;padding:52px;color:#b0b5c8;font-size:13px}
+.hist-loading span{animation:pulse 1.2s ease infinite}
+
+/* Status badges */
+.sbadge{display:inline-flex;align-items:center;font-size:10.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap}
 .sb-new{background:#e0f2fe;color:#0369a1}
 .sb-active{background:#dcfce7;color:#166534}
 .sb-pending{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
@@ -182,28 +209,35 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .sb-p1{background:#fee2e2;color:#b91c1c}
 .sb-p2{background:#fef3c7;color:#92400e}
 .sb-p3{background:#d1fae5;color:#065f46}
-.btn-xem{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1.5px solid #c7d7f4;background:#fff;color:#2563eb;cursor:pointer;transition:all .12s;white-space:nowrap}
+
+/* Action buttons */
+.btn-xem{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid #c7d7f4;background:#fff;color:#2563eb;cursor:pointer;transition:all .12s;white-space:nowrap}
 .btn-xem:hover{background:#eff6ff;border-color:#93c5fd}
-.btn-track{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1.5px solid #bbf7d0;background:#fff;color:#15803d;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn-track{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid #bbf7d0;background:#fff;color:#15803d;cursor:pointer;transition:all .12s;white-space:nowrap}
 .btn-track:hover{background:#f0fdf4}
-.btn-confirm{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:7px;border:none;background:#ea580c;color:#fff;cursor:pointer;transition:all .12s;white-space:nowrap;box-shadow:0 1px 4px rgba(234,88,12,.3)}
+.btn-confirm{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;border:none;background:#ea580c;color:#fff;cursor:pointer;transition:all .12s;white-space:nowrap;box-shadow:0 1px 3px rgba(234,88,12,.25)}
 .btn-confirm:hover{background:#c2410c}
-.btn-rate{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 10px;border-radius:7px;border:1.5px solid #e9d5ff;background:#fff;color:#7c3aed;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn-rate{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid #e9d5ff;background:#fff;color:#7c3aed;cursor:pointer;transition:all .12s;white-space:nowrap}
 .btn-rate:hover{background:#faf5ff}
-.hist-info-bar{display:flex;align-items:center;justify-content:space-between;margin:0 0 4px;flex-wrap:wrap;gap:6px}
-.hist-section-title{font-size:13px;font-weight:700;color:#1a1b2e}
-.hist-refresh-info{font-size:11px;color:#bbbec8}
-.btn-refresh-sm{font-size:12px;font-weight:600;padding:0 14px;height:36px;border-radius:9px;border:1.5px solid #e0e3f0;background:#fff;color:#6264a7;cursor:pointer;white-space:nowrap;display:none;align-items:center;gap:6px}
-.btn-refresh-sm:hover{background:#f4f4fc;border-color:#c8ccec}
-.btn-new-top{font-size:12px;font-weight:700;padding:0 16px;height:36px;border-radius:9px;border:none;background:#6264a7;color:#fff;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
-.btn-new-top:hover{background:#4a4cbf}
-.hist-greeting{padding:0 0 16px;border-bottom:1px solid #eef0f8;margin-bottom:0}
-.hist-greeting-name{font-size:15px;font-weight:700;color:#1a1b2e;margin-bottom:3px}
-.hist-greeting-sub{font-size:12px;color:#9aa0b5;line-height:1.55}
-.hist-td-sub{font-size:10px;color:#aaa;margin-top:2px;font-family:monospace}
-.hist-empty{text-align:center;padding:40px 16px;color:#aaa;font-size:13px}
-.hist-loading{text-align:center;padding:40px;color:#aaa;font-size:13px}
-.hist-loading span{animation:pulse 1.2s ease infinite}
+
+/* Responsive */
+@media(max-width:768px){
+  .hist-wrap{margin:-22px -28px -8px}
+  .hist-greeting{padding:20px 20px 16px}
+  .hist-panel{margin:0 12px 20px;padding:18px 16px}
+  .hist-topbar{gap:10px}
+  .hist-search-wrap{min-width:100%;flex:unset;width:100%}
+  .btn-refresh-sm,.btn-new-top{flex:1;justify-content:center}
+  .hist-thead{display:none}
+  .hist-tr{grid-template-columns:1fr auto;grid-template-rows:auto auto;padding:14px 16px;min-height:auto;gap:8px}
+  .hist-tr>div:nth-child(3){display:none}
+  .hist-tr>div:nth-child(4){grid-column:2;grid-row:1/3;display:flex;align-items:center}
+}
+@media(max-width:480px){
+  .hist-wrap{margin:-22px -20px -8px}
+  .hist-greeting{padding:18px 18px 14px}
+  .hist-panel{margin:0 10px 16px;padding:16px 14px}
+}
 
 /* ── Ticket detail modal ── */
 .modal-overlay{position:fixed;inset:0;background:rgba(10,12,30,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px)}
@@ -1901,27 +1935,29 @@ function _renderHistTable(list) {
   slot.innerHTML = `<div class="hist-wrap">
     <div class="hist-greeting">
       <div class="hist-greeting-name">${greetName}</div>
-      <div class="hist-greeting-sub">Bạn có thể theo dõi các yêu cầu đã gửi và xem tiến độ xử lý tại đây.</div>
+      <div class="hist-greeting-sub">Theo dõi tiến độ xử lý các yêu cầu hỗ trợ CNTT của bạn.</div>
     </div>
-    <div class="hist-topbar">
-      <div class="hist-search-wrap">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input class="hist-search" id="hist-search-inp"
-          placeholder="Tìm theo mã yêu cầu, nội dung, hệ thống hoặc người liên quan..."
-          oninput="if(!this._composing) filterHist(this.value)"
-          oncompositionstart="this._composing=true"
-          oncompositionend="this._composing=false; filterHist(this.value)">
+    <div class="hist-panel">
+      <div class="hist-topbar">
+        <div class="hist-search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aab" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="hist-search" id="hist-search-inp"
+            placeholder="Tìm theo mã yêu cầu, nội dung, hệ thống..."
+            oninput="if(!this._composing) filterHist(this.value)"
+            oncompositionstart="this._composing=true"
+            oncompositionend="this._composing=false; filterHist(this.value)">
+        </div>
+        <button class="btn-refresh-sm" style="display:inline-flex" onclick="showHistoryByEmail()" title="Cập nhật danh sách">🔄 Cập nhật</button>
+        <button class="btn-new-top" onclick="closeHistory()">✏️ Gửi yêu cầu mới</button>
       </div>
-      <button class="btn-refresh-sm" style="display:inline-flex" onclick="showHistoryByEmail()" title="Cập nhật danh sách">🔄 Cập nhật</button>
-      <button class="btn-new-top" onclick="closeHistory()">+ Gửi yêu cầu hỗ trợ mới</button>
-    </div>
-    <div class="hist-info-bar">
-      <div>
-        <div class="hist-section-title">Danh sách yêu cầu đã gửi</div>
-        <div class="hist-refresh-info">${_histAll.length} yêu cầu · Cập nhật lần cuối: <span id="hist-refresh-ts">${new Date().toLocaleTimeString('vi-VN')}</span></div>
+      <div class="hist-info-bar">
+        <div>
+          <div class="hist-section-title">Danh sách yêu cầu đã gửi</div>
+          <div class="hist-refresh-info">${_histAll.length} yêu cầu · Cập nhật: <span id="hist-refresh-ts">${new Date().toLocaleTimeString('vi-VN')}</span></div>
+        </div>
       </div>
+      <div id="hist-table-container">${rows}</div>
     </div>
-    <div id="hist-table-container">${rows}</div>
   </div>`;
 }
 
