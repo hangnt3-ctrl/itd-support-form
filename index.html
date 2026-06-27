@@ -22,7 +22,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .f-stats{display:flex;gap:0;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.18)}
 .f-stat-item{flex:1;text-align:center;padding:4px 4px;cursor:pointer;border-radius:8px;transition:background .15s;box-sizing:border-box;border:1.5px solid transparent}
 .f-stat-item:hover{background:rgba(255,255,255,.12)}
-.f-stat-item.active-filter{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.45)}
+.f-stat-item.active-filter{background:rgba(255,255,255,.22);border:1.5px solid rgba(255,255,255,.6);box-shadow:0 0 0 2px rgba(255,255,255,.12)}
 .f-stat-item+.f-stat-item{border-left:1px solid rgba(255,255,255,.15)}
 .f-stat-num{font-size:20px;font-weight:800;line-height:1.1;letter-spacing:-1px}
 .f-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.2px;opacity:.82;margin-top:4px;white-space:nowrap}
@@ -147,16 +147,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;b
 .hist-link:hover{color:#3a3cbf}
 /* ── History screen ── */
 @keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
-.hist-wrap{margin:-8px 0}
+.hist-wrap{margin:-8px 0;padding-bottom:8px}
 .hist-topbar{display:flex;align-items:center;gap:8px;margin-bottom:14px;flex-wrap:wrap}
 .hist-search-wrap{display:flex;align-items:center;background:#fff;border:1.5px solid #d1d5e8;border-radius:8px;overflow:hidden;flex:1;min-width:160px}
 .hist-search-wrap svg{margin-left:10px;flex-shrink:0;color:#aaa}
 .hist-search{border:none;outline:none;padding:8px 10px;font-size:13px;width:100%;font-family:inherit;color:#333}
 .hist-count{font-size:12px;color:#888;white-space:nowrap;margin-left:auto}
-.hist-table-wrap{border:1.5px solid #e2e4ef;border-radius:10px;overflow:hidden}
-.hist-thead{display:grid;grid-template-columns:1fr 110px 72px 86px 88px;background:#f8f9ff;border-bottom:1.5px solid #e2e4ef;padding:10px 20px;font-size:11px;font-weight:700;color:#888;letter-spacing:.2px;gap:10px}
+.hist-table-wrap{border:1.5px solid #e2e4ef;border-radius:10px;overflow:hidden;margin:0 4px}
+.hist-thead{display:grid;grid-template-columns:1fr 110px 90px 90px;background:#f8f9ff;border-bottom:1.5px solid #e2e4ef;padding:10px 20px;font-size:11px;font-weight:700;color:#888;letter-spacing:.2px;gap:10px}
 .hist-tbody{}
-.hist-tr{display:grid;grid-template-columns:1fr 110px 72px 86px 88px;padding:12px 20px;border-bottom:1px solid #f0f1f8;gap:10px;align-items:center;transition:background .1s}
+.hist-tr{display:grid;grid-template-columns:1fr 110px 90px 90px;padding:12px 20px;border-bottom:1px solid #f0f1f8;gap:10px;align-items:center;transition:background .1s}
 .hist-tr:last-child{border:none}
 .hist-tr:hover{background:#fafbff}
 .hist-td-id{font-size:12px;font-weight:700;color:#1a4fa0;cursor:default;font-variant-numeric:tabular-nums;word-break:break-all}
@@ -574,6 +574,10 @@ function showHistoryByEmail() {
 
   // Ẩn nav — các nút đã có trong topbar của hist-wrap
   document.getElementById('f-nav').style.display = 'none';
+
+  // Reset filter về 'all' mỗi lần load/refresh
+  _activeStat = 'all';
+  _syncStatFilter();
 
   _loadHistory(email, slot);
 
@@ -1781,13 +1785,16 @@ function _updateUserStats() {
 }
 
 let _activeStat = 'all';
-function filterByStatCat(cat) {
-  _activeStat = cat;
-  // Visual active state (stat items ở header — không bị re-render)
+function _syncStatFilter() {
   ['all','wait','active','pending','done'].forEach(c => {
     const el = document.getElementById('si-' + c);
-    if (el) el.classList.toggle('active-filter', c === cat);
+    if (el) el.classList.toggle('active-filter', c === _activeStat);
   });
+}
+function filterByStatCat(cat) {
+  _activeStat = cat;
+  // Visual active state — chỉ duy nhất ô đang active được highlight
+  _syncStatFilter();
   const sl = s => (s||'').trim().toLowerCase();
   const IS_DONE    = s => s.startsWith('hoan')||s.startsWith('hoàn')||s==='resolved'||s==='closed'||s==='da hoan thanh';
   const IS_ACTIVE  = s => s.startsWith('dang')||s.startsWith('đang')||s==='in_progress';
@@ -1850,21 +1857,19 @@ function _renderHistTable(list) {
       const sCls = sm.cls;
       const sLbl = sm.label;
       const title = cleanTitle(t.ticket_title);
-      const prio  = (t.priority || '').toUpperCase();
       rows += `<div class="hist-tr">
         <div>
           <div class="hist-td-title">${esc(title)}</div>
           <div class="hist-td-sub">${esc(t.ticket_id||'')}</div>
         </div>
         <div><span class="sbadge ${sCls}">${esc(sLbl)}</span></div>
-        <div>${prio ? `<span class="sbadge sb-${prio.toLowerCase()}" style="font-size:9px">${esc(prioLabel(prio))}</span>` : ''}</div>
         <div style="font-size:11px;color:#888;white-space:nowrap">${date}</div>
         <div class="hist-td-act">${actionBtn(t.ticket_status, t.ticket_id)}</div>
       </div>`;
     });
     rows = `<div class="hist-table-wrap">
       <div class="hist-thead">
-        <div>Nội dung yêu cầu</div><div>Tình trạng</div><div>Ưu tiên</div><div>Ngày tạo</div><div>Thao tác</div>
+        <div>Nội dung yêu cầu</div><div>Tình trạng</div><div>Ngày tạo</div><div>Thao tác</div>
       </div>
       <div class="hist-tbody">${rows}</div>
     </div>`;
