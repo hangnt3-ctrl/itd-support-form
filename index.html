@@ -2237,13 +2237,4 @@ _resizeObs.observe(document.body);
 ║  function doPost(e) {                                         ║
 ║    const d  = JSON.parse(e.postData.contents);               ║
 ║    const ss = SpreadsheetApp.getActiveSpreadsheet();         ║
-║    let sh   = ss.getSheetByName('ITD_Tickets');              ║
-║    if (!sh) sh = ss.insertSheet('ITD_Tickets');              ║
-║    if (sh.getLastRow()===0) sh.appendRow([                   ║
-║      'TicketID','Title','SubmittedBy','Email','Dept',        ║
-║      'Group','SubType','Tool','Features','DirectUser',       ║
-║      'Description','Impact','Priority','SLA','Status',       ║
-║      'ManagerName','ManagerEmail','ManagerDept',             ║
-║      'Attachments','SubmittedAt'                             ║
-║    ]);                                                        ║
-║    const a = d.answers||{};          
+║    let sh   = ss.ge
