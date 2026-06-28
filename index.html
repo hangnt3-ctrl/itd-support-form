@@ -1921,16 +1921,31 @@ function _renderHistTable(list) {
   }
   // Helper: nút thao tác theo trạng thái
   function actionBtn(status, ticketId) {
-    const s = (status||'').toLowerCase();
+    const s = (status||'').trim().toLowerCase();
     const tid = escAttr(ticketId||'');
+    const ds  = escAttr(status||'(empty)'); // debug: xem giá trị thực
     const icon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/></svg>`;
-    if (s.includes('xac nhan') || s.includes('xác nhận') || s === 'pending_manager_confirmation')
-      return `<button class="btn-confirm" data-ticket-id="${tid}">✔ Xác nhận</button>`;
-    if (s.startsWith('dang') || s.startsWith('đang') || s === 'in_progress')
-      return `<button class="btn-track" data-ticket-id="${tid}">${icon} Theo dõi</button>`;
-    if (s.startsWith('hoan') || s.startsWith('hoàn') || s === 'resolved' || s === 'closed')
-      return `<button class="btn-rate" data-ticket-id="${tid}">★ Đánh giá</button>`;
-    return `<button class="btn-xem" data-ticket-id="${tid}">${icon} Xem chi tiết</button>`;
+    // Chờ xác nhận quản lý
+    const isPending = s.includes('xac nhan') || s.includes('xác nhận') ||
+                      s.includes('pending') || s === 'pending_manager_confirmation' ||
+                      s.includes('cho xac');
+    // Đang xử lý / In Progress
+    const isActive  = s.startsWith('dang') || s.startsWith('đang') ||
+                      s === 'in_progress'   || s.includes('processing') ||
+                      s.includes('in progress') || s.includes('dang xu ly');
+    // Hoàn thành / Resolved / Closed
+    const isDone    = s.startsWith('hoan') || s.startsWith('hoàn') ||
+                      s === 'resolved'      || s === 'closed' ||
+                      s.includes('hoan thanh') || s.includes('hoàn thành') ||
+                      s.includes('da hoan') || s.includes('đã hoàn') ||
+                      s.includes('done')   || s.includes('complete');
+    if (isPending)
+      return `<button class="btn-confirm" data-ticket-id="${tid}" data-status="${ds}">✔ Xác nhận</button>`;
+    if (isActive)
+      return `<button class="btn-track" data-ticket-id="${tid}" data-status="${ds}">${icon} Theo dõi</button>`;
+    if (isDone)
+      return `<button class="btn-rate" data-ticket-id="${tid}" data-status="${ds}">★ Đánh giá</button>`;
+    return `<button class="btn-xem" data-ticket-id="${tid}" data-status="${ds}">${icon} Xem chi tiết</button>`;
   }
 
   let rows = '';
