@@ -725,37 +725,30 @@ async function _tryBrowserSSO() {
   }
 }
 
-// Auth via Teams popup (không bị Teams block, không dùng window.open)
+// Auth via Teams popup — Teams SDK v2: authenticate() trả về Promise
 function _teamsAuthPopup() {
-  return new Promise(function(resolve, reject) {
-    var authUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/auth.html';
-    microsoftTeams.authentication.authenticate({
-      url:    authUrl,
-      width:  600,
-      height: 535,
-      successCallback: function(result) {
-        try {
-          var data = JSON.parse(result);
-          state.user.name  = data.name  || '';
-          state.user.email = data.email || '';
-          // Token đã ở trong localStorage → acquireTokenSilent sẽ dùng được
-          var app = _getMsalApp();
-          var accounts = app.getAllAccounts();
-          if (accounts.length > 0) {
-            app.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] })
-              .then(function(r) { _applyAccountToState(r.account); })
-              .catch(function() {})
-              .finally(function() { showHistoryByEmail(); resolve(true); });
-          } else {
-            showHistoryByEmail();
-            resolve(true);
-          }
-        } catch(e) { reject(e); }
-      },
-      failureCallback: function(reason) {
-        reject(new Error(reason));
-      }
-    });
+  var authUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/auth.html';
+  return microsoftTeams.authentication.authenticate({
+    url:    authUrl,
+    width:  600,
+    height: 535,
+  }).then(function(resultStr) {
+    // resultStr là chuỗi được truyền vào notifySuccess
+    try {
+      var data = JSON.parse(resultStr);
+      state.user.name  = data.name  || '';
+      state.user.email = data.email || '';
+    } catch(e) {}
+    // Token đã lưu vào localStorage bởi auth.html
+    var app = _getMsalApp();
+    var accounts = app.getAllAccounts();
+    if (accounts.length > 0) {
+      return app.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] })
+        .then(function(r) { _applyAccountToState(r.account); })
+        .catch(function() {})
+        .then(function() { showHistoryByEmail(); });
+    }
+    showHistoryByEmail();
   });
 }
 
@@ -769,15 +762,24 @@ async function msLogin() {
     if (btn) { btn.disabled = false; btn.innerHTML = msLoginSvg; }
   }
 
-  // Trong Teams desktop: dùng Teams popup auth (không bị chặn)
-  if (_teamsInitialized && typeof microsoftTeams !== 'undefined') {
+  // Trong Teams: dùng Teams popup auth (không bị chặn bởi Teams)
+  if (typeof microsoftTeams !== 'undefined') {
     try {
+      if (!_teamsInitialized) {
+        await _withTimeout(microsoftTeams.app.initialize(), 2000);
+        _teamsInitialized = true;
+      }
       await _teamsAuthPopup();
       return;
     } catch(e) {
-      _restoreBtn();
-      showToast('Đăng nhập thất bại: ' + (e.errorCode || e.message || e), 'error');
-      return;
+      const msg = e && e.message || String(e);
+      if (msg === 'timeout' || msg.includes('timeout')) {
+        // Không thực sự trong Teams — fall through sang loginRedirect
+      } else {
+        _restoreBtn();
+        showToast('Đăng nhập thất bại: ' + msg, 'error');
+        return;
+      }
     }
   }
 
