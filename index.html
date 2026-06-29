@@ -6,6 +6,7 @@
 <title>Cổng hỗ trợ CNTT — Phòng CNTT HAS</title>
 <!-- MSAL.js 2.x — Microsoft Authentication Library (miễn phí, CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* Khi nhúng vào SharePoint iframe: loại bỏ padding thừa, co giãn toàn chiều rộng */
@@ -619,13 +620,58 @@ function _applyAccountToState(account) {
   state.user.email = (account.username || '').toLowerCase();
 }
 
+
+// ── Teams SSO ─────────────────────────────────────────────────────────────────
+let _teamsLoginHint = '';     // email lấy từ Teams context
+let _teamsInitialized = false;
+
+// Thử tự đăng nhập im lặng qua Microsoft Teams context
+async function _tryTeamsSSO() {
+  try {
+    if (typeof microsoftTeams === 'undefined') return false;
+    if (!_teamsInitialized) {
+      await microsoftTeams.app.initialize();
+      _teamsInitialized = true;
+    }
+    // Lấy context Teams: userPrincipalName = email domain Azure AD
+    const ctx = await microsoftTeams.app.getContext();
+    _teamsLoginHint = (ctx.user && (ctx.user.userPrincipalName || ctx.user.loginHint)) || '';
+    if (!_teamsLoginHint) return false;
+
+    const app = _getMsalApp();
+
+    // Ưu tiên 1: cache hit theo email (nhanh, không cần network)
+    const accounts = app.getAllAccounts();
+    const match = accounts.find(a =>
+      (a.username || '').toLowerCase() === _teamsLoginHint.toLowerCase()
+    );
+    if (match) {
+      try {
+        const res = await app.acquireTokenSilent({ scopes: SP_SCOPES, account: match });
+        _applyAccountToState(res.account);
+        return true;
+      } catch(_e) { /* hết hạn → thử ssoSilent */ }
+    }
+
+    // Ưu tiên 2: ssoSilent với loginHint — hiệu quả cao trong Teams WebView
+    const res = await app.ssoSilent({ scopes: SP_SCOPES, loginHint: _teamsLoginHint });
+    _applyAccountToState(res.account);
+    return true;
+  } catch(e) {
+    console.warn('[Teams SSO] silent fail:', e.errorCode || e.message || e);
+    return false;
+  }
+}
+
 // Đăng nhập Microsoft — gọi từ nút trên Q1 (user gesture → popup hoạt động)
 async function msLogin() {
   const btn = document.getElementById('btn-ms-login');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang đăng nhập...'; }
   try {
     const app = _getMsalApp();
-    const result = await app.acquireTokenPopup({ scopes: SP_SCOPES });
+    const popupReq = { scopes: SP_SCOPES };
+    if (_teamsLoginHint) popupReq.loginHint = _teamsLoginHint;
+    const result = await app.acquireTokenPopup(popupReq);
     _applyAccountToState(result.account);
     // Chuyển sang màn hình lịch sử
     showHistoryByEmail();
@@ -1008,17 +1054,23 @@ function attachListeners(q) {
   if (q.id === 'Q1') {
     // Auto-detect MSAL cached account (đăng nhập từ phiên trước)
     if (!state.user.name) {
+      // Bước 1: thử MSAL cache trước (không cần network)
       try {
         const cached = _getMsalApp().getAllAccounts();
         if (cached.length > 0) {
           _applyAccountToState(cached[0]);
-          // Re-render Q1 với trạng thái đã login
           renderQ('Q1');
           return;
         }
       } catch {}
-      // Chưa login → nút login hiện, Next disabled
+      // Bước 2: thử Teams SSO im lặng (async, không block UI)
       setNextEnabled(false);
+      _tryTeamsSSO().then(ok => {
+        if (ok) {
+          renderQ('Q1'); // re-render với trạng thái đã login
+        }
+        // Nếu fail → nút Login vẫn hiển thị, user bấm thủ công
+      });
       return;
     }
     // Đã login → enable Next nếu đã chọn nhóm
