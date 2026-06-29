@@ -621,26 +621,32 @@ function _applyAccountToState(account) {
 }
 
 
-// ── Teams SSO ─────────────────────────────────────────────────────────────────
+// ── Teams SSO + Browser SSO ──────────────────────────────────────────────────
 let _teamsLoginHint = '';     // email lấy từ Teams context
 let _teamsInitialized = false;
 
-// Thử tự đăng nhập im lặng qua Microsoft Teams context
+// Helper: race một promise với timeout
+function _withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+  ]);
+}
+
+// Thử tự đăng nhập im lặng qua Microsoft Teams context (max 3s)
 async function _tryTeamsSSO() {
   try {
     if (typeof microsoftTeams === 'undefined') return false;
     if (!_teamsInitialized) {
-      await microsoftTeams.app.initialize();
+      await _withTimeout(microsoftTeams.app.initialize(), 2000);
       _teamsInitialized = true;
     }
-    // Lấy context Teams: userPrincipalName = email domain Azure AD
-    const ctx = await microsoftTeams.app.getContext();
+    const ctx = await _withTimeout(microsoftTeams.app.getContext(), 2000);
     _teamsLoginHint = (ctx.user && (ctx.user.userPrincipalName || ctx.user.loginHint)) || '';
     if (!_teamsLoginHint) return false;
 
     const app = _getMsalApp();
-
-    // Ưu tiên 1: cache hit theo email (nhanh, không cần network)
+    // Cache hit theo email
     const accounts = app.getAllAccounts();
     const match = accounts.find(a =>
       (a.username || '').toLowerCase() === _teamsLoginHint.toLowerCase()
@@ -649,16 +655,42 @@ async function _tryTeamsSSO() {
       try {
         const res = await app.acquireTokenSilent({ scopes: SP_SCOPES, account: match });
         _applyAccountToState(res.account);
+        console.log('[Teams SSO] cache hit ✓');
         return true;
-      } catch(_e) { /* hết hạn → thử ssoSilent */ }
+      } catch(_e) { /* hết hạn → ssoSilent */ }
     }
-
-    // Ưu tiên 2: ssoSilent với loginHint — hiệu quả cao trong Teams WebView
     const res = await app.ssoSilent({ scopes: SP_SCOPES, loginHint: _teamsLoginHint });
     _applyAccountToState(res.account);
+    console.log('[Teams SSO] ssoSilent ✓');
     return true;
   } catch(e) {
-    console.warn('[Teams SSO] silent fail:', e.errorCode || e.message || e);
+    console.warn('[Teams SSO] fail:', e.errorCode || e.message || e);
+    return false;
+  }
+}
+
+// Fallback: browser SSO thuần (Chrome/Edge đã đăng nhập Microsoft)
+// Dùng Microsoft session cookie trong trình duyệt, không cần loginHint
+async function _tryBrowserSSO() {
+  try {
+    const app = _getMsalApp();
+    // Thử cache không cần hint
+    const accounts = app.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const res = await app.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+        _applyAccountToState(res.account);
+        console.log('[Browser SSO] cache ✓');
+        return true;
+      } catch(_e) { /* hết hạn */ }
+    }
+    // ssoSilent không hint: dùng session cookie Microsoft (hoạt động trên Chrome/Edge)
+    const res = await app.ssoSilent({ scopes: SP_SCOPES });
+    _applyAccountToState(res.account);
+    console.log('[Browser SSO] ssoSilent ✓');
+    return true;
+  } catch(e) {
+    console.warn('[Browser SSO] fail:', e.errorCode || e.message || e);
     return false;
   }
 }
@@ -1063,14 +1095,14 @@ function attachListeners(q) {
           return;
         }
       } catch {}
-      // Bước 2: thử Teams SSO im lặng (async, không block UI)
+      // Bước 2: thử Teams SSO → Browser SSO → login button (async, không block UI)
       setNextEnabled(false);
-      _tryTeamsSSO().then(ok => {
-        if (ok) {
-          renderQ('Q1'); // re-render với trạng thái đã login
-        }
-        // Nếu fail → nút Login vẫn hiển thị, user bấm thủ công
-      });
+      _tryTeamsSSO()
+        .then(ok => ok || _tryBrowserSSO())  // nếu Teams fail → thử browser
+        .then(ok => {
+          if (ok) renderQ('Q1');
+          // Nếu cả hai fail → nút Login vẫn hiển thị, user bấm thủ công
+        });
       return;
     }
     // Đã login → enable Next nếu đã chọn nhóm
