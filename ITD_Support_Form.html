@@ -1,0 +1,2491 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cổng hỗ trợ CNTT — Phòng CNTT HAS</title>
+<!-- MSAL.js 2.x — Microsoft Authentication Library (miễn phí, CDN) -->
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+<script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+/* Khi nhúng vào SharePoint iframe: loại bỏ padding thừa, co giãn toàn chiều rộng */
+html{min-height:100%;overflow-x:hidden}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#eef0f8;min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:16px 8px;overflow-x:hidden}
+/* ── CARD ── */
+.f-card{background:#fff;border-radius:18px;box-shadow:0 6px 32px rgba(98,100,167,.14);width:100%;max-width:680px;overflow:hidden;display:flex;flex-direction:column;max-height:calc(100vh - 32px)}
+/* ── HEADER ── */
+.f-header{background:linear-gradient(135deg,#1a1b2e 0%,#3d3f6e 55%,#6264a7 100%);padding:14px 24px 14px;color:#fff}
+.f-logo{font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;opacity:.6;margin-bottom:3px}
+.f-title{font-size:17px;font-weight:800;margin-bottom:2px}
+.f-sub{font-size:11px;opacity:.55}
+/* ── HEADER STATS ── */
+.f-stats{display:flex;gap:0;margin-top:12px;padding-top:10px;border-top:1px solid rgba(255,255,255,.18)}
+.f-stat-item{flex:1;text-align:center;padding:6px 4px;cursor:pointer;border-radius:10px;transition:background .15s,box-shadow .15s;box-sizing:border-box;box-shadow:inset 0 0 0 1.5px transparent}
+.f-stat-item:hover{background:rgba(255,255,255,.13)}
+.f-stat-item.active-filter{background:rgba(255,255,255,.2);box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.55)}
+.f-stat-item+.f-stat-item{border-left:1px solid rgba(255,255,255,.15)}
+.f-stat-num{font-size:20px;font-weight:800;line-height:1.1;letter-spacing:-1px}
+.f-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.2px;opacity:.82;margin-top:4px;white-space:nowrap}
+.stat-dot{font-size:8px;margin-right:3px}
+.dot-wait{color:#fbbf24}
+.dot-active{color:#34d399}
+.dot-done{color:#60a5fa}
+/* ── PROGRESS ── */
+.f-progress-wrap{padding:0;background:#fff;border-bottom:1px solid #f0f1f8}
+.f-progress-bar{height:3px;background:#6264a7;transition:width .35s ease;min-width:4px}
+.f-step-info{display:flex;justify-content:space-between;align-items:center;padding:8px 20px 6px;font-size:11px;color:#aaa}
+.f-step-label{font-weight:600;color:#6264a7}
+/* ── BREADCRUMB ── */
+.f-breadcrumb{padding:6px 20px 4px;min-height:28px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;background:#fafbff;border-bottom:1px solid #f0f1f8}
+.bc-chip{font-size:10px;background:#f0edff;color:#5240a8;border-radius:6px;padding:2px 8px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.bc-sep{color:#ccc;font-size:10px}
+/* ── BODY ── */
+.f-body{padding:22px 28px 8px;overflow-y:auto;flex:1 1 auto}
+/* ── QUESTION ── */
+.q-badge{display:inline-block;font-size:10px;font-weight:700;background:#f0edff;color:#5240a8;border-radius:6px;padding:2px 8px;margin-bottom:10px;letter-spacing:.5px}
+.q-title{font-size:15px;font-weight:700;color:#1a1b2e;margin-bottom:16px;line-height:1.5}
+.q-hint{font-size:12px;color:#888;margin-bottom:14px;line-height:1.6;background:#fafbff;border:1px solid #e8eaf5;border-radius:8px;padding:10px 12px}
+/* ── CHOICE GRID ── */
+.choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.choice-item{border:1.5px solid #e2e4ef;border-radius:10px;padding:10px 12px;cursor:pointer;transition:border .12s,background .12s,transform .1s;display:flex;align-items:center;gap:9px;font-size:13px;color:#444;user-select:none}
+.choice-item:hover{border-color:#b0b2d8;background:#fafbff;transform:translateY(-1px)}
+.choice-item.sel{border-color:#6264a7;background:#f4f4fc;color:#3a3cbf;font-weight:600}
+.choice-emoji{font-size:18px;flex-shrink:0;line-height:1}
+/* ── CHOICE LIST ── */
+.choice-list{display:flex;flex-direction:column;gap:7px}
+.choice-list-item{border:1.5px solid #e2e4ef;border-radius:10px;padding:11px 14px;cursor:pointer;transition:border .12s,background .12s;font-size:13px;color:#444;display:flex;align-items:center;gap:10px;user-select:none}
+.choice-list-item:hover{border-color:#b0b2d8;background:#fafbff}
+.choice-list-item.sel{border-color:#6264a7;background:#f4f4fc;color:#3a3cbf;font-weight:600}
+.choice-list-item .radio{width:16px;height:16px;border:2px solid #ccc;border-radius:50%;flex-shrink:0;transition:all .12s;display:flex;align-items:center;justify-content:center}
+.choice-list-item.sel .radio{border-color:#6264a7;background:#6264a7}
+.choice-list-item.sel .radio::after{content:'';width:6px;height:6px;background:#fff;border-radius:50%}
+/* ── IMPACT ── */
+.impact-list{display:flex;flex-direction:column;gap:8px}
+.impact-item{border:1.5px solid #e2e4ef;border-radius:11px;padding:12px 16px;cursor:pointer;transition:all .12s;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.impact-item:hover{border-color:#b0b2d8;background:#fafbff}
+.impact-item.sel{border-color:#6264a7;background:#f4f4fc}
+.impact-left{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#333}
+.impact-item.sel .impact-left{color:#3a3cbf}
+.impact-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.prio{font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px}
+.p1{background:#fde7e9;color:#b00}.p2{background:#fff3cd;color:#8a5700}.p3{background:#e6f4ea;color:#1a7a30}
+.sla-lbl{font-size:11px;color:#aaa}
+/* ── TEXTAREA ── */
+.f-textarea{width:100%;min-height:120px;padding:11px 13px;border:1.5px solid #e2e4ef;border-radius:10px;font-size:13px;color:#333;resize:vertical;font-family:inherit;line-height:1.6;outline:none;transition:border .12s}
+.f-textarea:focus{border-color:#6264a7;box-shadow:0 0 0 3px rgba(98,100,167,.1)}
+.char-row{display:flex;justify-content:flex-end;margin-top:4px;font-size:11px;color:#aaa}
+/* ── STRUCTURED FIELDS ── */
+.f-fields{display:flex;flex-direction:column;gap:12px}
+.f-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.f-field label{display:block;font-size:11px;font-weight:700;color:#666;text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.f-field input,.f-field select{width:100%;padding:9px 12px;border:1.5px solid #e2e4ef;border-radius:8px;font-size:13px;color:#333;outline:none;transition:border .12s;font-family:inherit}
+.f-field input:focus,.f-field select:focus{border-color:#6264a7;box-shadow:0 0 0 3px rgba(98,100,167,.1)}
+.f-field.req label::after{content:' *';color:#c00}
+.hint-box{background:#fff8f0;border:1px solid #f5c876;border-radius:8px;padding:10px 12px;font-size:12px;color:#7a5200;margin-bottom:14px;line-height:1.6}
+/* ── FILE UPLOAD ── */
+.file-drop{border:2px dashed #c8cadf;border-radius:12px;padding:24px;text-align:center;cursor:pointer;transition:all .15s;background:#fafbff}
+.file-drop:hover,.file-drop.drag{border-color:#6264a7;background:#f4f4fc}
+.file-drop-icon{font-size:32px;margin-bottom:8px}
+.file-drop-txt{font-size:13px;color:#666;margin-bottom:4px}
+.file-drop-sub{font-size:11px;color:#aaa}
+.file-drop input[type="file"]{display:none}
+.file-list{margin-top:12px;display:flex;flex-direction:column;gap:6px}
+.file-item{display:flex;align-items:center;gap:8px;background:#f4f4fc;border-radius:8px;padding:7px 10px;font-size:12px}
+.file-item-name{flex:1;color:#333;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-item-size{color:#aaa;flex-shrink:0}
+.file-item-del{color:#c00;cursor:pointer;font-size:14px;flex-shrink:0;line-height:1}
+.skip-hint{font-size:12px;color:#aaa;text-align:center;margin-top:10px}
+/* ── USER BAR ── */
+.user-bar{display:flex;align-items:center;gap:10px;background:#f8f9ff;border:1px solid #e2e4ef;border-radius:10px;padding:10px 14px;margin-bottom:18px}
+.user-av{width:34px;height:34px;border-radius:50%;background:#6264a7;color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.user-name{font-size:13px;font-weight:700;color:#333}
+.user-email{font-size:11px;color:#888}
+/* ── MS LOGIN BUTTON ── */
+.btn-ms-login{width:100%;padding:11px 16px;border-radius:10px;border:1.5px solid #d0d2e8;background:#fff;color:#1a1b2e;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:18px;transition:all .15s}
+.btn-ms-login:hover{background:#f4f4fc;border-color:#6264a7;color:#3a3cbf}
+.btn-ms-login:disabled{opacity:.5;cursor:not-allowed}
+.ms-logo{width:18px;height:18px;flex-shrink:0}
+/* ── NAV ── */
+.f-nav{display:flex;gap:10px;padding:14px 24px 20px;border-top:1px solid #f2f3f5;margin-top:4px}
+.btn-back{padding:10px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;border:1.5px solid #e2e4ef;background:#fff;color:#666;transition:all .12s}
+.btn-back:hover{background:#f2f3f5;border-color:#ccc}
+.btn-back:disabled{opacity:.4;cursor:not-allowed}
+.btn-next{flex:1;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:#6264a7;color:#fff;transition:all .12s;display:flex;align-items:center;justify-content:center;gap:6px}
+.btn-next:hover:not(:disabled){background:#4a4cbf}
+.btn-next:disabled{background:#c0c2df;cursor:not-allowed}
+/* ── CONFIRM SCREEN ── */
+.confirm-head{text-align:center;margin-bottom:18px}
+.confirm-icon{font-size:36px}
+.confirm-title{font-size:16px;font-weight:800;color:#1a1b2e;margin-top:6px}
+.confirm-sub{font-size:12px;color:#888;margin-top:3px}
+.confirm-table{border:1.5px solid #e8eaf5;border-radius:10px;overflow:hidden;margin-bottom:12px}
+.confirm-row{display:flex;padding:10px 14px;border-bottom:1px solid #f0f1f8;font-size:13px;gap:12px}
+.confirm-row:last-child{border:none}
+.confirm-row:nth-child(even){background:#fafbff}
+.confirm-key{color:#888;font-weight:600;flex-shrink:0;width:140px;font-size:12px}
+.confirm-val{color:#1a1b2e;font-weight:600;flex:1;word-break:break-word}
+.confirm-badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:2px 9px;border-radius:10px}
+/* ── DONE SCREEN ── */
+.done-card{background:#f0fdf4;border:1.5px solid #86efac;border-radius:12px;padding:20px 22px;text-align:center;margin-bottom:16px}
+.done-id{font-size:16px;font-weight:500;color:#15803d;font-family:monospace;letter-spacing:.5px}
+.done-label{font-size:12px;color:#4ade80;margin-bottom:10px}
+.done-msg{font-size:13px;color:#166534;line-height:1.6}
+/* ── SPINNER ── */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:15px;height:15px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .75s linear infinite;flex-shrink:0}
+/* ── TOAST ── */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(60px);background:#1a1b2e;color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;opacity:0;transition:all .3s;pointer-events:none;z-index:999;white-space:normal;max-width:90vw;text-align:center;word-break:break-word}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.toast.success{background:#15803d}
+.toast.error{background:#b91c1c}
+.toast.warn{background:#b45309}
+/* ── Edit button in confirm ── */
+.edit-btn{border:none;background:none;cursor:pointer;font-size:13px;padding:2px 4px;opacity:.5;transition:opacity .12s;flex-shrink:0;margin-left:4px}
+.edit-btn:hover{opacity:1}
+/* ── History link ── */
+.hist-link{display:block;text-align:center;margin-top:10px;font-size:12px;color:#6264a7;cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.hist-link:hover{color:#3a3cbf}
+/* ── History screen ── */
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* Outer shell: full-bleed light background, cancel f-body padding */
+.hist-wrap{margin:-22px -28px -8px;padding:0;background:#f0f2f8;min-height:calc(100% + 30px);display:flex;flex-direction:column}
+
+/* Greeting: sits on the background */
+.hist-greeting{padding:24px 28px 20px;border-bottom:none;flex-shrink:0}
+.hist-greeting-name{font-size:16px;font-weight:700;color:#1a1b2e;margin-bottom:4px}
+.hist-greeting-sub{font-size:12px;color:#8a90a8;line-height:1.6}
+
+/* White panel card */
+.hist-panel{background:#fff;border-radius:18px;margin:0 20px 28px;padding:24px 28px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.05);flex:1}
+
+/* Toolbar: 40px controls, consistent height */
+.hist-topbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.hist-search-wrap{display:flex;align-items:center;background:#f7f8fc;border:1.5px solid #e4e6f0;border-radius:10px;overflow:hidden;flex:1;min-width:240px;height:40px;transition:border .15s,box-shadow .15s}
+.hist-search-wrap:focus-within{background:#fff;border-color:#6264a7;box-shadow:0 0 0 3px rgba(98,100,167,.1)}
+.hist-search-wrap svg{margin-left:14px;flex-shrink:0;color:#aab}
+.hist-search{border:none;outline:none;padding:0 12px;font-size:13px;width:100%;font-family:inherit;color:#333;height:100%;background:transparent}
+.hist-count{font-size:12px;color:#888;white-space:nowrap;margin-left:auto}
+
+/* Buttons: same 40px height */
+.btn-refresh-sm{font-size:12px;font-weight:600;padding:0 16px;height:40px;border-radius:10px;border:1.5px solid #e4e6f0;background:#fff;color:#6264a7;cursor:pointer;white-space:nowrap;display:none;align-items:center;gap:6px;transition:all .15s;flex-shrink:0}
+.btn-refresh-sm:hover{background:#f4f4fc;border-color:#b8badf}
+.btn-new-top{font-size:12px;font-weight:700;padding:0 18px;height:40px;border-radius:10px;border:none;background:#6264a7;color:#fff;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:6px;transition:background .15s;flex-shrink:0}
+.btn-new-top:hover{background:#5052a0}
+
+/* Section info */
+.hist-info-bar{margin:0 0 18px}
+.hist-section-title{font-size:15px;font-weight:700;color:#1a1b2e;line-height:1.3}
+.hist-refresh-info{font-size:13px;color:#8a90a8;line-height:20px;margin-top:4px}
+
+/* Table container */
+.hist-table-wrap{border:1px solid #e8eaf2;border-radius:14px;overflow:hidden}
+
+/* Table header */
+.hist-thead{display:grid;grid-template-columns:160px 1fr 100px 108px;background:#f7f8fc;border-bottom:1px solid #eceef8;padding:11px 20px;font-size:10px;font-weight:700;color:#9aa0b8;letter-spacing:.7px;text-transform:uppercase;gap:12px}
+
+/* Table body */
+.hist-tbody{}
+.hist-tr{display:grid;grid-template-columns:160px 1fr 100px 108px;padding:16px 20px;border-bottom:1px solid #f2f4f9;gap:12px;align-items:center;transition:background .12s;min-height:68px}
+.hist-tr:last-child{border:none}
+.hist-tr:hover{background:#f8f9fe}
+
+/* Table cells */
+.hist-td-id{font-size:12px;font-weight:700;color:#1a4fa0;cursor:default;font-variant-numeric:tabular-nums;word-break:break-all}
+.hist-td-title{font-size:13px;color:#1a1b2e;line-height:1.45;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.hist-td-date{font-size:11px;color:#888;white-space:nowrap}
+.hist-td-act{display:flex;justify-content:flex-end;padding-right:2px}.hist-td-act button{width:100px;justify-content:center}
+.hist-td-sub{font-size:10px;color:#b0b5c8;margin-top:2px;font-family:monospace}
+.hist-empty{text-align:center;padding:52px 20px;color:#b0b5c8;font-size:13px}
+.hist-loading{text-align:center;padding:52px;color:#b0b5c8;font-size:13px}
+.hist-loading span{animation:pulse 1.2s ease infinite}
+
+/* Status badges */
+.sbadge{display:inline-flex;align-items:center;font-size:10.5px;font-weight:600;padding:4px 10px;border-radius:20px;white-space:nowrap}
+.sb-new{background:#e0f2fe;color:#0369a1}
+.sb-active{background:#dcfce7;color:#166534}
+.sb-pending{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}
+.sb-done{background:#f0fdf4;color:#15803d}
+.sb-p1{background:#fee2e2;color:#b91c1c}
+.sb-p2{background:#fef3c7;color:#92400e}
+.sb-p3{background:#d1fae5;color:#065f46}
+
+/* Action buttons */
+.btn-xem{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid #c7d7f4;background:#fff;color:#2563eb;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn-xem:hover{background:#eff6ff;border-color:#93c5fd}
+.btn-track{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid #bbf7d0;background:#fff;color:#15803d;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn-track:hover{background:#f0fdf4}
+.btn-confirm{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:5px 12px;border-radius:8px;border:none;background:#ea580c;color:#fff;cursor:pointer;transition:all .12s;white-space:nowrap;box-shadow:0 1px 3px rgba(234,88,12,.25)}
+.btn-confirm:hover{background:#c2410c}
+.btn-rate{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;padding:5px 12px;border-radius:8px;border:1.5px solid #e9d5ff;background:#fff;color:#7c3aed;cursor:pointer;transition:all .12s;white-space:nowrap}
+.btn-rate:hover{background:#faf5ff}
+
+/* Responsive */
+.tool-badge{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;color:#3b4a6b;background:#eef1fb;border-radius:7px;padding:4px 10px;white-space:nowrap;max-width:150px;overflow:hidden;text-overflow:ellipsis;line-height:1.4}
+.tool-empty{font-size:11px;color:#c0c5d8;font-style:italic}
+.hist-stats-card{background:#fff;border-radius:16px;margin:0 20px 16px;padding:18px 20px 16px;box-shadow:0 1px 3px rgba(0,0,0,.06),0 0 0 1px rgba(0,0,0,.05)}
+.hist-stats-hdr{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.hist-stats-title{font-size:13px;font-weight:700;color:#1a1b2e}
+.hist-stats-hint{font-size:11px;color:#9aa0b8}
+.hist-stats-card .f-stats{display:flex;gap:0;border-top:1px solid #eef0f8;padding-top:10px;margin-top:0}
+.hist-stats-card .f-stat-item{flex:1;text-align:center;padding:8px 4px;border-radius:10px;cursor:pointer;transition:background .15s,box-shadow .15s;box-sizing:border-box;box-shadow:inset 0 0 0 1.5px transparent}
+.hist-stats-card .f-stat-item:hover{background:rgba(98,100,167,.07)}
+.hist-stats-card .f-stat-item.active-filter{background:rgba(98,100,167,.09);box-shadow:inset 0 0 0 1.5px rgba(98,100,167,.38)}
+.hist-stats-card .f-stat-item+.f-stat-item{border-left:1px solid #eef0f8}
+.hist-stats-card .f-stat-num{font-size:20px;font-weight:800;line-height:1.1;letter-spacing:-1px;color:#1a1b2e}
+.hist-stats-card .f-stat-lbl{font-size:10px;font-weight:600;letter-spacing:.2px;color:#8a90a8;margin-top:4px;white-space:nowrap;opacity:1}
+@media(max-width:640px){
+  /* Card: edge-to-edge trên mobile */
+  body{padding:0}
+  .f-card{border-radius:0;max-height:100vh;max-height:100dvh;max-width:100%}
+
+  /* Header */
+  .f-header{padding:12px 18px}
+  .f-title{font-size:15px}
+  .f-logo{letter-spacing:1.5px}
+
+  /* hist-wrap: f-body vẫn padding:22px 28px 8px → giữ nguyên cancel margin */
+  .hist-wrap{margin:-22px -28px -8px}
+
+  /* Greeting */
+  .hist-greeting{padding:16px 20px 12px}
+  .hist-greeting-name{font-size:15px;overflow-wrap:break-word;word-break:break-word}
+  .hist-greeting-sub{font-size:11px;white-space:normal;overflow-wrap:break-word}
+
+  /* Stats card */
+  .hist-stats-card{margin:0 14px 12px;padding:14px 14px 10px;border-radius:14px}
+  .hist-stats-hdr{flex-direction:column;align-items:flex-start;gap:2px;margin-bottom:10px}
+  .hist-stats-hint{font-size:10px}
+
+  /* Stats: 1 hàng ngang, cuộn ngang trong wrapper – không để tràn trang */
+  .hist-stats-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:0 -14px;padding:0 14px 4px}
+  .hist-stats-card .f-stats{display:flex;flex-wrap:nowrap;gap:8px;border-top:1px solid #eef0f8;padding-top:10px;width:max-content;min-width:100%}
+  .hist-stats-card .f-stat-item{min-width:112px;flex-shrink:0;padding:10px 12px;border-left:none !important;border-radius:10px}
+  .hist-stats-card .f-stat-num{font-size:22px}
+  .hist-stats-card .f-stat-lbl{font-size:13px;white-space:nowrap}
+
+  /* Panel */
+  .hist-panel{margin:0 14px 20px;padding:16px 16px;border-radius:14px}
+
+  /* Toolbar: search full-width, nút thao tác thành hàng 2-cột bên dưới */
+  .hist-topbar{flex-direction:column;align-items:stretch;gap:10px;margin-bottom:16px}
+  .hist-search-wrap{min-width:0;width:100%;flex:unset}
+  .hist-topbar-btns{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .btn-refresh-sm{display:inline-flex !important;justify-content:center;width:100%;height:38px;font-size:12px;flex:unset}
+  .btn-new-top{justify-content:center;width:100%;height:38px;font-size:12px;flex:unset}
+
+  /* Table: ẩn header, rows dạng card */
+  .hist-thead{display:none}
+  .hist-tr{display:flex;flex-direction:column;align-items:stretch;padding:14px 14px;min-height:auto;gap:0;border-bottom:1px solid #f2f4f9}
+  .hist-tr:last-child{border:none}
+  /* Tool badge */
+  .hist-tr>div:nth-child(1){margin-bottom:8px}
+  /* Title + ID */
+  .hist-tr>div:nth-child(2){margin-bottom:6px}
+  /* Date */
+  .hist-tr>div:nth-child(3){margin-bottom:12px;white-space:normal}
+  /* Action: stretch full width */
+  .hist-td-act{justify-content:stretch}
+  .btn-xem,.btn-track,.btn-confirm,.btn-rate{width:100%;justify-content:center;height:40px;font-size:13px;border-radius:10px}
+  .tool-badge{max-width:100%}
+  .hist-td-title{font-size:13px}
+
+  /* Table-wrap: remove side borders on mobile for cleaner look */
+  .hist-table-wrap{border-left:none;border-right:none;border-radius:10px}
+}
+@media(max-width:390px){
+  .hist-stats-card{margin:0 10px 10px}
+  .hist-panel{margin:0 10px 16px}
+  .hist-stats-card .f-stat-num{font-size:16px}
+}
+
+/* ── Ticket detail modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(10,12,30,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(2px)}
+.modal-card{background:#fff;border-radius:18px;width:100%;max-width:560px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.25);overflow:hidden}
+.modal-head{display:flex;align-items:center;gap:10px;padding:18px 22px 14px;border-bottom:1px solid #f0f0f8;flex-shrink:0}
+.modal-head-id{font-family:monospace;font-size:15px;font-weight:800;color:#1a4fa0;flex:1}
+.modal-close{width:32px;height:32px;border-radius:8px;border:none;background:#f4f4f8;color:#666;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.modal-close:hover{background:#e8e8f4;color:#333}
+.modal-body{overflow-y:auto;padding:18px 22px;flex:1}
+.modal-section{margin-bottom:16px}
+.modal-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#aaa;margin-bottom:8px}
+.modal-row{display:flex;gap:10px;padding:7px 0;border-bottom:1px solid #f5f5fb;font-size:13px}
+.modal-row:last-child{border-bottom:none}
+.modal-key{color:#888;flex-shrink:0;width:140px;font-weight:500}
+.modal-val{color:#1a1b2e;font-weight:600;flex:1;word-break:break-word}
+.modal-status-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+</style>
+</head>
+<body>
+
+<div class="f-card">
+  <div class="f-header">
+    <div class="f-logo">Phòng Công nghệ Thông tin</div>
+    <div class="f-title">Cổng hỗ trợ CNTT</div>
+  </div>
+
+  <div class="f-progress-wrap" id="f-progress-wrap">
+    <div class="f-progress-bar" id="progress-bar" style="width:5%"></div>
+    <div class="f-step-info" id="f-step-info">
+      <span id="step-counter"></span>
+      <span class="f-step-label" id="step-label"></span>
+    </div>
+  </div>
+
+  <div class="f-breadcrumb" id="breadcrumb"></div>
+
+  <div class="f-body">
+    <div id="q-slot"></div>
+  </div>
+
+  <div class="f-nav" id="f-nav">
+    <button class="btn-back" id="btn-back" onclick="goBack()">← Quay lại</button>
+    <button class="btn-next" id="btn-next" onclick="goNext()" disabled>
+      <span id="btn-next-text">Tiếp theo</span>
+    </button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════╗
+// ║  CONFIG                                                  ║
+// ╚══════════════════════════════════════════════════════════╝
+const CONFIG = {
+  BACKEND: 'sharepoint',   // 'flow' | 'sharepoint' | 'googlesheet'
+  FLOW_URL: '',            // ← Dán URL Power Automate HTTP trigger vào đây
+
+  // ── SharePoint ──
+  SP_SITE:       'https://haseduvn.sharepoint.com/sites/ITDSupport',
+  SP_LIST:       'ITD_Tickets',
+  // List thứ 2 (song song) — điền tên list SP đã có sẵn, để '' nếu không dùng
+  SP_LIST_2:     '',
+  // List thống kê riêng với quyền đọc mở (Everyone can read) — do Power Automate cập nhật
+  // Nếu để trống sẽ fallback về đọc SP_LIST có phân trang (chậm hơn)
+  SP_STATS_LIST: 'ITD_QueueStats',
+
+  // ── Google Apps Script (chỉ dùng khi BACKEND = 'googlesheet') ──
+  GOOGLE_SCRIPT_URL: '', // ← Dán URL Web App GAS vào đây
+
+  // ── Security flags ──
+  // Production: giữ tất cả là false. Chỉ bật tạm thời khi dev/debug.
+  // ALLOW_STATS_MAIN_LIST_FALLBACK: false → không đọc toàn ITD_Tickets để tính stats
+  //   (chỉ bật khi ITD_QueueStats chưa setup xong hoặc đang debug)
+  // ALLOW_FLOW_BACKEND / ALLOW_GAS_BACKEND: false → chặn backend phụ không dùng
+  //   (bật đúng backend được dùng, giữ các backend còn lại là false)
+  ALLOW_STATS_MAIN_LIST_FALLBACK: true,  // fallback đếm từ ITD_Tickets khi ITD_QueueStats chưa sẵn sàng
+  ALLOW_FLOW_BACKEND:             false,
+  ALLOW_GAS_BACKEND:              false,
+
+  // ── Azure AD App (đăng ký 1 lần miễn phí tại portal.azure.com) ──
+  // Xem hướng dẫn đăng ký ở cuối file
+  MSAL_CLIENT_ID: 'cf3fc815-e55f-45ee-a451-9dc5b0c233aa', // Application (client) ID
+  MSAL_TENANT_ID: '010a6d4c-53ee-42a6-b68e-74c646a3297c', // Directory (tenant) ID
+  // Redirect URI: URL trang này sau khi deploy lên GitHub Pages
+  // VD: https://has-itd.github.io/itd-support/ITD_Support_Form.html
+  MSAL_REDIRECT_URI: window.location.href.split('?')[0].split('#')[0],
+
+  ORG_PREFIX: 'ITD',
+  FORM_ID: 'service_support_registration',
+};
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  MSAL — XÁC THỰC MICROSOFT (MSAL.js 2.x)               ║
+// ╚══════════════════════════════════════════════════════════╝
+// Khởi tạo lazy: chỉ tạo khi cần (tránh lỗi nếu CDN chưa load xong)
+let _msalApp = null;
+function _getMsalApp() {
+  if (!_msalApp) {
+    _msalApp = new msal.PublicClientApplication({
+      auth: {
+        clientId:    CONFIG.MSAL_CLIENT_ID,
+        authority:   'https://login.microsoftonline.com/' + CONFIG.MSAL_TENANT_ID,
+        redirectUri: CONFIG.MSAL_REDIRECT_URI,
+      },
+      cache: { cacheLocation: 'sessionStorage' },
+      system: { allowRedirectInIframe: true },
+    });
+  }
+  return _msalApp;
+}
+
+// Phạm vi quyền tối thiểu cho SharePoint REST API
+// AllSites.Write đủ để tạo item + đọc item của chính user qua filter submitter_email
+// KHÔNG dùng AllSites.Read riêng để giảm bề mặt tấn công
+const SP_SCOPES = ['https://haseduvn.sharepoint.com/AllSites.Write'];
+
+// Lấy Access Token (tự động — popup đăng nhập nếu chưa đăng nhập)
+// getToken: chỉ dùng silent (popup được xử lý trực tiếp trong submitForm)
+async function getToken() {
+  const app = _getMsalApp();
+  const accounts = app.getAllAccounts();
+  if (!accounts.length) throw new Error('Chưa xác thực — vui lòng thử lại');
+  const res = await app.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+  return res.accessToken;
+}
+
+// Helper: fetch với Bearer token (thay thế credentials:include)
+async function spFetch(url, opts={}, signal) {
+  const token = await getToken();
+  const headers = Object.assign({
+    'Accept': 'application/json;odata=verbose',
+    'Authorization': 'Bearer ' + token,
+  }, opts.headers || {});
+  // Timeout 30s nếu không có signal riêng
+  const ctrl    = signal ? null : new AbortController();
+  const timer   = ctrl ? setTimeout(() => ctrl.abort(), 30000) : null;
+  const fetchSignal = signal || (ctrl && ctrl.signal);
+  try {
+    return await fetch(url, { ...opts, headers, signal: fetchSignal });
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  QUESTION DEFINITIONS                                    ║
+// ╚══════════════════════════════════════════════════════════╝
+const QUESTIONS = {
+  Q1: {
+    id:'Q1', field:'support_need_group',
+    badge:'',
+    title:'Anh/chị cần hỗ trợ nhóm nhu cầu nào?',
+    type:'choice_grid', required:true,
+    options:[
+      {label:'Tài khoản và đăng nhập', value:'account_login',  emoji:'🔑', next:'Q11'},
+      {label:'Phân quyền',             value:'permission',      emoji:'🛡️', next:'Q12'},
+      {label:'Lỗi khi sử dụng',        value:'usage_error',    emoji:'⚠️', next:'Q2'},
+      {label:'Hướng dẫn sử dụng',      value:'user_guide',     emoji:'📖', next:'Q2'},
+      {label:'Dữ liệu',                value:'data',            emoji:'🗂️', next:'Q2'},
+      {label:'Chính sách',             value:'policy',          emoji:'📜', next:'Q2'},
+      {label:'Khác / Chưa rõ',         value:'other_unclear',  emoji:'❓', next:'Q2'},
+    ]
+  },
+  Q2: {
+    id:'Q2', field:'support_tool',
+    badge:'Công cụ cần hỗ trợ',
+    title:'Anh/Chị đang cần hỗ trợ trên công cụ nào?',
+    type:'choice_grid', required:true, next:'Q3',
+    options:[
+      {label:'MS Teams',                   value:'ms_teams',        emoji:'💬'},
+      {label:'Gmail',                      value:'gmail',           emoji:'📧'},
+      {label:'HFE (HAS Family Engagement)',value:'hfe',             emoji:'🏫'},
+      {label:'Timesheet',                  value:'timesheet',       emoji:'⏱️'},
+      {label:'LMS (Canvas)',               value:'lms_canvas',      emoji:'📚'},
+      {label:'CBA',                        value:'cba',             emoji:'📝'},
+      {label:'CRMs',                       value:'crms',            emoji:'🤝'},
+      {label:'HSO',                        value:'hso',             emoji:'🏥'},
+      {label:'Quản lý học sinh (3T)',       value:'qlhs_3t',         emoji:'🎓'},
+      {label:'Power BI',                   value:'power_bi',        emoji:'📊'},
+      {label:'Quản lý học sinh ra/vào',    value:'qlhs_in_out',     emoji:'🚪'},
+      {label:'Cổng dịch vụ nội bộ',        value:'internal_portal', emoji:'🌐'},
+      {label:'Khác',                       value:'other_tool',      emoji:'❓'},
+    ]
+  },
+  Q3: {
+    id:'Q3', field:'request_description',
+    badge:'Mô tả chi tiết',
+    title:'Anh/chị vui lòng mô tả chi tiết yêu cầu',
+    type:'long_text', required:true, next:'Q4',
+    minLen:20, maxLen:3000,
+    placeholder:'Vui lòng mô tả chi tiết:\n• Đang gặp lỗi gì?\n• Lỗi xảy ra trên công cụ nào?\n• Thời điểm phát sinh lỗi\n• Người dùng bị ảnh hưởng\n• Kỳ vọng kết quả mong muốn\n• Các bước đã thực hiện trước đó (nếu có)',
+  },
+  Q4: {
+    id:'Q4', field:'impact_scope',
+    badge:'Mức độ ảnh hưởng',
+    title:'Mức độ ảnh hưởng của yêu cầu',
+    type:'impact', required:true,
+    options:[
+      {label:'Cá nhân',          value:'individual',      icon:'👤', priority:'P3', sla:'24–48h', next:'Q10'},
+      {label:'Bộ phận',          value:'department',      icon:'👥', priority:'P2', sla:'8h',     next:'Q5'},
+      {label:'Học sinh',         value:'student',         icon:'🎓', priority:'P1', sla:'4–8h',   next:'Q5'},
+      {label:'CMHS',             value:'parent_guardian', icon:'👪', priority:'P1', sla:'4–8h',   next:'Q5'},
+      {label:'Đối tác',          value:'partner',         icon:'🤝', priority:'P2', sla:'8h',     next:'Q5'},
+    ]
+  },
+  Q5: {
+    id:'Q5', field:'manager_confirmation_info',
+    badge:'Xác nhận quản lý',
+    title:'Vui lòng cung cấp email quản lý để xác nhận yêu cầu',
+    type:'manager_form', required:true, next:'Q10',
+    hint:'Yêu cầu ảnh hưởng đến nhóm/tổ chức cần có xác nhận quản lý để IT ưu tiên xử lý đúng SLA. Có thể nhập nhiều email cách nhau bằng dấu ";".',
+  },
+  Q10: {
+    id:'Q10', field:'attachments',
+    badge:'Tệp đính kèm',
+    title:'Vui lòng cung cấp thêm tệp đính kèm, hình ảnh để việc hỗ trợ được diễn ra nhanh chóng hơn',
+    type:'file_upload', required:false, next:'END',
+    hint:'Không bắt buộc · jpg, png, heic, pdf, doc, docx, xls, xlsx, mp4, mov · Tối đa 5 file, mỗi file ≤ 10MB',
+    accept:'.jpg,.jpeg,.png,.heic,.pdf,.doc,.docx,.xls,.xlsx,.mp4,.mov',
+    maxFiles:5, maxSizeMB:10,
+  },
+  Q11: {
+    id:'Q11', field:'account_login_issue_type',
+    badge:'Tài khoản & Đăng nhập',
+    title:'Vui lòng chọn nội dung gần đúng nhất với nhu cầu của anh/chị',
+    type:'choice_list', required:true,
+    options:[
+      {label:'Tôi cần tạo tài khoản mới',                              value:'create_new_account',          next:'Q2'},
+      {label:'Tôi quên mật khẩu',                                       value:'forgot_password',              next:'Q2'},
+      {label:'Tôi không đăng nhập được do cần kiểm tra xác minh',      value:'login_failed_check_required',  next:'Q2'},
+      {label:'Tôi cần khôi phục tài khoản',                            value:'restore_account',              next:'Q2'},
+      {label:'Tôi cần cập nhật thông tin tài khoản',                   value:'update_account_info',          next:'Q2'},
+      {label:'Tôi cần khoá tài khoản',                                  value:'lock_account',                 next:'Q2'},
+      {label:'Tôi cần bàn giao tài khoản',                             value:'transfer_account',             next:'Q2'},
+      {label:'Tôi cần hỗ trợ vấn đề khác',                            value:'other_account_issue',          next:'Q2'},
+    ]
+  },
+  Q12: {
+    id:'Q12', field:'permission_request_type',
+    badge:'Phân quyền',
+    title:'Vui lòng chọn nội dung đúng nhất với nhu cầu của anh/chị',
+    type:'choice_list', required:true,
+    options:[
+      {label:'Tôi cần được cấp quyền truy cập nhóm', value:'grant_group_access',           next:'Q2'},
+      {label:'Tôi cần thu hồi quyền truy cập nhóm',  value:'revoke_group_access',          next:'Q2'},
+      {label:'Tôi cần được cấp quyền xoá bài đăng',  value:'grant_delete_post_permission', next:'Q2'},
+      {label:'Tôi cần được cấp quyền sửa bài đăng',  value:'grant_edit_post_permission',   next:'Q2'},
+      {label:'Tôi cần quyền quản trị',                value:'grant_admin_permission',       next:'Q2'},
+      {label:'Tôi cần cấp quyền khác',                value:'other_permission_request',     next:'Q2'},
+    ]
+  },
+  Q13: {
+    id:'Q13', field:'account_registration',
+    badge:'Đăng ký tài khoản mới',
+    title:'Anh/chị cần tạo tài khoản trên công cụ nào?',
+    type:'account_reg_form', required:true, next:'Q14',
+
+  },
+  Q14: {
+    id:'Q14', field:'direct_user_info',
+    badge:'Người dùng trực tiếp',
+    title:'Anh/Chị vui lòng cung cấp thông tin về người sử dụng trực tiếp',
+    type:'user_info_form', required:true, next:'Q3',
+    hint:'Thông tin này dùng để tạo tài khoản chính xác cho người dùng thực tế.',
+  },
+};
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  STATE                                                   ║
+// ╚══════════════════════════════════════════════════════════╝
+const state = {
+  currentQ: 'Q1',
+  history: [],        // stack of visited Q IDs
+  answers: {},        // { Q1: {label, value, ...extra}, ... }
+  files: [],          // File objects from Q10
+  user: { name:'', email:'' },
+  spContext: false,
+};
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  BOOT                                                    ║
+// ╚══════════════════════════════════════════════════════════╝
+(async function boot() {
+  // Xử lý redirect từ loginRedirect (nếu đang trở về sau đăng nhập)
+  const redirectOk = await _handleMsalRedirect();
+  detectUser();
+  if (redirectOk) {
+    showHistoryByEmail();
+    _setupEventListeners();
+    return;
+  }
+  renderQ('Q1');
+  // Đóng modal bằng phím Escape
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  // ── Event delegation: xử lý tất cả click có data-* thay vì inline onclick ──
+  document.addEventListener('click', function(e) {
+    const ci = e.target.closest('[data-choice]');
+    if (ci) { selChoice(ci.dataset.qid, parseInt(ci.dataset.idx, 10)); return; }
+
+    const ii = e.target.closest('[data-impact]');
+    if (ii) { selImpact(ii.dataset.qid, parseInt(ii.dataset.idx, 10)); return; }
+
+    const rf = e.target.closest('[data-remove-file]');
+    if (rf) { removeFile(rf.dataset.removeFile); return; }
+
+    const vt = e.target.closest('[data-ticket-id]');
+    if (vt && vt.dataset.ticketId) { viewTicket(vt.dataset.ticketId); return; }
+
+    const eq = e.target.closest('[data-edit-q]');
+    if (eq && eq.dataset.editQ) { editFromConfirm(eq.dataset.editQ); return; }
+  });
+  _setupEventListeners();
+})();
+
+function _setupEventListeners() {
+  // Already attached via delegation in boot — no-op if called twice (idempotent guard)
+}
+
+function detectUser() {
+  if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.userDisplayName) {
+    state.user.name  = _spPageContextInfo.userDisplayName || '';
+    state.user.email = (_spPageContextInfo.userEmail || '').toLowerCase();
+    state.spContext  = true;
+  }
+}
+
+// Thử lấy thông tin user từ MSAL cache (không cần popup)
+function _applyAccountToState(account) {
+  if (!account) return;
+  state.user.name  = account.name || account.username || '';
+  state.user.email = (account.username || '').toLowerCase();
+}
+
+
+// ── Teams SSO + Browser SSO ──────────────────────────────────────────────────
+var _teamsLoginHint = '';     // email lấy từ Teams context
+var _teamsInitialized = false;
+
+// Helper: race một promise với timeout
+function _withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
+  ]);
+}
+
+// Xử lý redirect từ loginRedirect (gọi ngay khi page load)
+async function _handleMsalRedirect() {
+  try {
+    const result = await _getMsalApp().handleRedirectPromise();
+    if (result && result.account) {
+      _applyAccountToState(result.account);
+      return true;
+    }
+  } catch(e) {
+    console.warn('[MSAL] handleRedirectPromise error:', e.errorCode || e.message);
+  }
+  return false;
+}
+
+// Thử tự đăng nhập im lặng qua Microsoft Teams context (max 3s)
+async function _tryTeamsSSO() {
+  try {
+    if (typeof microsoftTeams === 'undefined') return false;
+    if (!_teamsInitialized) {
+      await _withTimeout(microsoftTeams.app.initialize(), 2000);
+      _teamsInitialized = true;
+    }
+    const ctx = await _withTimeout(microsoftTeams.app.getContext(), 2000);
+    _teamsLoginHint = (ctx.user && (ctx.user.userPrincipalName || ctx.user.loginHint)) || '';
+    if (!_teamsLoginHint) return false;
+
+    const app = _getMsalApp();
+    // Cache hit theo email
+    const accounts = app.getAllAccounts();
+    const match = accounts.find(a =>
+      (a.username || '').toLowerCase() === _teamsLoginHint.toLowerCase()
+    );
+    if (match) {
+      try {
+        const res = await app.acquireTokenSilent({ scopes: SP_SCOPES, account: match });
+        _applyAccountToState(res.account);
+        console.log('[Teams SSO] cache hit ✓');
+        return true;
+      } catch(_e) { /* hết hạn → ssoSilent */ }
+    }
+    const res = await app.ssoSilent({ scopes: SP_SCOPES, loginHint: _teamsLoginHint });
+    _applyAccountToState(res.account);
+    console.log('[Teams SSO] ssoSilent ✓');
+    return true;
+  } catch(e) {
+    console.warn('[Teams SSO] fail:', e.errorCode || e.message || e);
+    return false;
+  }
+}
+
+// Fallback: browser SSO thuần (Chrome/Edge đã đăng nhập Microsoft)
+// Dùng Microsoft session cookie trong trình duyệt, không cần loginHint
+async function _tryBrowserSSO() {
+  try {
+    const app = _getMsalApp();
+    // Thử cache không cần hint
+    const accounts = app.getAllAccounts();
+    if (accounts.length > 0) {
+      try {
+        const res = await app.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
+        _applyAccountToState(res.account);
+        console.log('[Browser SSO] cache ✓');
+        return true;
+      } catch(_e) { /* hết hạn */ }
+    }
+    // ssoSilent không hint: dùng session cookie Microsoft (hoạt động trên Chrome/Edge)
+    const res = await app.ssoSilent({ scopes: SP_SCOPES });
+    _applyAccountToState(res.account);
+    console.log('[Browser SSO] ssoSilent ✓');
+    return true;
+  } catch(e) {
+    // block_iframe_reload = MSAL chủ động chặn để tránh vòng lặp iframe — bình thường
+    if (e.errorCode !== 'block_iframe_reload') {
+      console.warn('[Browser SSO] fail:', e.errorCode || e.message || e);
+    }
+    return false;
+  }
+}
+
+// Đăng nhập Microsoft — dùng loginRedirect (hoạt động trong iframe/Teams)
+async function msLogin() {
+  const btn = document.getElementById('btn-ms-login');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang chuyển hướng...'; }
+  try {
+    const app = _getMsalApp();
+    const req = { scopes: SP_SCOPES, redirectStartPage: window.location.href };
+    if (_teamsLoginHint) req.loginHint = _teamsLoginHint;
+    await app.loginRedirect(req);
+    // loginRedirect navigates away — code below will not run
+  } catch(e) {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Đăng nhập bằng Microsoft`;
+    }
+    showToast('Đăng nhập thất bại: ' + (e.errorCode || e.message || e), 'error');
+  }
+}
+
+// Hiển thị lịch sử theo email (gọi sau khi đăng nhập)
+function showHistoryByEmail() {
+  const email = state.user.email;
+  if (!email) { renderQ('Q1'); return; }
+
+  document.getElementById('breadcrumb').innerHTML = '';
+  document.getElementById('progress-bar').style.width = '100%';
+  document.getElementById('step-counter').textContent = '';
+  document.getElementById('step-label').textContent = state.user.name || email;
+  // Ẩn progress-wrap và breadcrumb khi xem lịch sử
+  document.getElementById('f-progress-wrap').style.display = 'none';
+  document.getElementById('breadcrumb').style.display = 'none';
+
+  const slot = document.getElementById('q-slot');
+  slot.innerHTML = `<div class="hist-loading"><span>⏳ Đang tải lịch sử yêu cầu...</span></div>`;
+
+  // Ẩn nav — các nút đã có trong topbar của hist-wrap
+  document.getElementById('f-nav').style.display = 'none';
+
+  // Reset filter về 'all' mỗi lần load/refresh
+  _activeStat = 'all';
+  _syncStatFilter();
+
+  _loadHistory(email, slot);
+
+}
+
+// ── Auto-refresh lịch sử ─────────────────────────────────────
+let _histRefreshTimer = null;
+let _histFetchAbort  = null; // AbortController cho fetch đang chạy
+let _statsRefreshTimer = null;
+
+// ── Thống kê header (CHỜ / ĐANG XỬ LÝ / HOÀN THÀNH HÔM NAY) ─
+async function loadQueueStats() {
+  if (!state.user.email) return;
+  try {
+    if (CONFIG.SP_STATS_LIST) {
+      try {
+        await _loadStatsFromStatslist();
+        return; // thành công → xong
+      } catch(eStats) {
+        // Stats list lỗi → kiểm tra flag trước khi fallback
+        if (!CONFIG.ALLOW_STATS_MAIN_LIST_FALLBACK) {
+          console.warn('[ITD] Không đọc được ' + CONFIG.SP_STATS_LIST + ':', eStats.message,
+            '— fallback bị tắt (ALLOW_STATS_MAIN_LIST_FALLBACK: false). Stats sẽ không hiển thị.');
+          return;
+        }
+        console.warn('[ITD] Không đọc được ' + CONFIG.SP_STATS_LIST + ':', eStats.message,
+          '→ fallback đếm từ', CONFIG.SP_LIST);
+      }
+    } else {
+      if (!CONFIG.ALLOW_STATS_MAIN_LIST_FALLBACK) {
+        console.warn('[ITD] SP_STATS_LIST chưa cấu hình và fallback bị tắt. Stats sẽ không hiển thị.');
+        return;
+      }
+      console.warn('[ITD] SP_STATS_LIST chưa cấu hình → fallback về đếm từ main list.');
+    }
+    // Fallback: đếm trực tiếp từ ITD_Tickets
+    await _loadStatsFromMainList();
+  } catch(e) {
+    console.warn('[ITD] Không tải được thống kê:', e);
+  }
+}
+
+// Đọc từ ITD_QueueStats — list gọn, quyền Everyone read
+async function _loadStatsFromStatslist() {
+  const url = CONFIG.SP_SITE + "/_api/lists/getByTitle('" + CONFIG.SP_STATS_LIST
+    + "')/items?$select=stat_key,stat_value&$top=10&_=" + Date.now();
+  const res = await spFetch(url);
+  if (!res.ok) throw new Error('stats list HTTP ' + res.status);
+  const json = await res.json();
+  const items = (json.d && json.d.results) ? json.d.results : [];
+  const map = {};
+  items.forEach(it => { map[it.stat_key] = it.stat_value; });
+  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v ?? '—'; };
+  setEl('stat-wait',   map['wait']   ?? '—');
+  setEl('stat-active', map['active'] ?? '—');
+  setEl('stat-done',   map['done_today'] ?? '—');
+}
+
+// Fallback: đọc trực tiếp SP_LIST có xử lý phân trang
+async function _loadStatsFromMainList() {
+  const midnight = new Date(); midnight.setHours(0,0,0,0);
+  const midMs = midnight.getTime();
+  const sl = v => (v||'').trim().toLowerCase();
+  const IS_WAIT   = s => s.startsWith('cho tiep') || s.startsWith('chờ tiếp');
+  const IS_ACTIVE = s => s.startsWith('dang')     || s.startsWith('đang');
+  const IS_DONE   = s => s.startsWith('hoan')     || s.startsWith('hoàn');
+
+  let wait = 0, active = 0, done = 0;
+  // Chỉ lấy field cần thiết; xử lý @odata.nextLink để tránh bỏ sót trang
+  let nextUrl = CONFIG.SP_SITE + "/_api/lists/getByTitle('" + CONFIG.SP_LIST
+    + "')/items?$select=TicketStatus,Modified&$top=200&_=" + Date.now();
+
+  while (nextUrl) {
+    const res = await spFetch(nextUrl);
+    if (!res.ok) break;
+    const json = await res.json();
+    const items = (json.d && json.d.results) ? json.d.results : [];
+    for (const item of items) {
+      const s = sl(item.TicketStatus || '');
+      if      (IS_WAIT(s))   { wait++; }
+      else if (IS_ACTIVE(s)) { active++; }
+      else if (IS_DONE(s))   {
+        const m = (item.Modified || '').match(/\/Date\((-?\d+)/);
+        if (m && parseInt(m[1], 10) >= midMs) done++;
+      }
+    }
+    // SP verbose: trang tiếp theo nằm trong __next
+    nextUrl = json.d?.__next || null;
+  }
+
+  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setEl('stat-wait',   wait);
+  setEl('stat-active', active);
+  setEl('stat-done',   done);
+}
+
+function _loadHistory(email, slot) {
+  // Hủy timer và fetch cũ nếu có
+  if (_histRefreshTimer) { clearInterval(_histRefreshTimer); _histRefreshTimer = null; }
+  if (_histFetchAbort)   { _histFetchAbort.abort(); _histFetchAbort = null; }
+
+  function doFetch(showLoading) {
+    if (showLoading) {
+      slot.innerHTML = `<div class="hist-loading"><span>⏳ Đang tải lịch sử yêu cầu...</span></div>`;
+    }
+    const ctrl = new AbortController();
+    _histFetchAbort = ctrl;
+    fetchHistoryByEmail(email, ctrl.signal)
+      .then(tickets => {
+        if (ctrl.signal.aborted) return; // đã bị cancel — bỏ qua kết quả cũ
+        renderHistory(tickets);
+        // Cập nhật timestamp làm mới
+        const ts = document.getElementById('hist-refresh-ts');
+        if (ts) ts.textContent = new Date().toLocaleTimeString('vi-VN');
+      })
+      .catch(err => {
+        if (showLoading) {
+          slot.innerHTML = `<div class="hist-empty">⚠️ Không thể tải dữ liệu.<br><small>${esc(err.message)}</small></div>`;
+        }
+      });
+  }
+
+  doFetch(true);
+  // Auto-refresh mỗi 3 phút khi đang xem lịch sử
+  _histRefreshTimer = setInterval(() => doFetch(false), 3 * 60 * 1000);
+}
+
+// Fetch lịch sử theo submitter_email
+async function fetchHistoryByEmail(email, signal) {
+  const filter = encodeURIComponent("submitter_email eq '" + email.replace(/'/g,"''") + "'");
+  const select = '$select=ticket_id,Title,TicketStatus,TicketPriority,submission_time,TicketTool,TicketGroup';
+  const order  = '$orderby=submission_time desc';
+  const top    = '$top=50';
+  const url = CONFIG.SP_SITE + "/_api/lists/getByTitle('" + CONFIG.SP_LIST + "')/items?" +
+              '$filter=' + filter + '&' + select + '&' + order + '&' + top;
+  const res = await spFetch(url, {}, signal);
+  if (!res.ok) throw new Error('SharePoint: HTTP ' + res.status);
+  const data = await res.json();
+  return (data.d?.results || []).map(it => ({
+    ticket_id:    it.ticket_id    || it.Id,
+    ticket_title: it.Title,
+    ticket_status:it.TicketStatus  || 'submitted',
+    priority:     it.TicketPriority|| 'P3',
+    submitted_at: it.submission_time || it.Created,
+    support_tool: it.TicketTool   || '',
+  }));
+}
+
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  ROUTING                                                 ║
+// ╚══════════════════════════════════════════════════════════╝
+function getNextQ(qId) {
+  const q = QUESTIONS[qId];
+  if (!q) return null;
+  // fixed-next: không cần answer để định tuyến
+  if (q.next) {
+    // Context: sau Q2 trong flow tạo tài khoản mới → đi Q13 thay vì Q3
+    if (qId === 'Q2' && (state.answers['Q11']||{}).value === 'create_new_account') return 'Q13';
+    return q.next;
+  }
+  // option-based: cần answer để biết next
+  const ans = state.answers[qId];
+  if (!ans) return null;
+  const opt = (q.options || []).find(o => o.value === ans.value);
+  return opt ? opt.next : null;
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  RENDER                                                  ║
+// ╚══════════════════════════════════════════════════════════╝
+function renderQ(qId) {
+  if (qId === 'END') { renderConfirm(); return; }
+  if (qId === 'DONE') { renderDone();   return; }
+
+  const q = QUESTIONS[qId];
+  if (!q) return;
+  state.currentQ = qId;
+
+  const slot = document.getElementById('q-slot');
+  slot.innerHTML = buildQHTML(q);
+  attachListeners(q);
+  updateProgress();
+  updateBreadcrumb();
+  updateNav(q);
+}
+
+function buildQHTML(q) {
+  let html = '';
+  // Q1: hiển thị login hoặc user info + form
+  if (q.id === 'Q1') {
+    if (!state.user.name) {
+      // Chưa đăng nhập → chỉ hiện nút login, không render phần còn lại
+      return `
+        <div style="text-align:center;padding:32px 8px 16px">
+          <div style="font-size:48px;margin-bottom:14px">🔐</div>
+          <div style="font-size:15px;font-weight:700;color:#1a1b2e;margin-bottom:6px">Đăng nhập để tiếp tục</div>
+          <div style="font-size:13px;color:#666;margin-bottom:24px;line-height:1.6">
+            Sử dụng tài khoản Microsoft của trường<br>để gửi yêu cầu và xem lịch sử hỗ trợ.
+          </div>
+          <button id="btn-ms-login" class="btn-ms-login" onclick="msLogin()">
+            <svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg">
+              <rect x="1" y="1" width="9" height="9" fill="#f25022"/>
+              <rect x="11" y="1" width="9" height="9" fill="#7fba00"/>
+              <rect x="1" y="11" width="9" height="9" fill="#00a4ef"/>
+              <rect x="11" y="11" width="9" height="9" fill="#ffb900"/>
+            </svg>
+            Đăng nhập bằng Microsoft
+          </button>
+        </div>`;
+    }
+    // Đã đăng nhập → user bar + lịch sử (không hỏi mã NV)
+    const ini = initials(state.user.name);
+    html += `<div class="user-bar">
+      <div class="user-av">${ini}</div>
+      <div style="flex:1">
+        <div class="user-name">${esc(state.user.name)}</div>
+        <div class="user-email">${esc(state.user.email)}</div>
+      </div>
+      <span class="hist-link" style="margin:0" onclick="showHistoryByEmail()">📋 Lịch sử</span>
+    </div>`;
+  }
+  html += `<div class="q-badge">${esc(q.badge)}</div>`;
+  html += `<div class="q-title">${esc(q.title)}</div>`;
+  if (q.hint) html += `<div class="q-hint">${esc(q.hint)}</div>`;
+
+  const saved = state.answers[q.id];
+
+  switch (q.type) {
+    case 'choice_grid':
+      html += `<div class="choice-grid">` + q.options.map((o,i) =>
+        `<div class="choice-item${saved && saved.value===o.value?' sel':''}" id="ci-${i}" data-choice data-qid="${escAttr(q.id)}" data-idx="${i}">
+          <span class="choice-emoji">${o.emoji||'•'}</span>${esc(o.label)}
+        </div>`
+      ).join('') + `</div>`;
+      break;
+
+    case 'choice_list':
+      html += `<div class="choice-list">` + q.options.map((o,i) =>
+        `<div class="choice-list-item${saved && saved.value===o.value?' sel':''}" id="ci-${i}" data-choice data-qid="${escAttr(q.id)}" data-idx="${i}">
+          <div class="radio"></div>${esc(o.label)}
+        </div>`
+      ).join('') + `</div>`;
+      break;
+
+    case 'impact':
+      html += `<div class="impact-list">` + q.options.map((o,i) =>
+        `<div class="impact-item${saved && saved.value===o.value?' sel':''}" id="ci-${i}" data-impact data-qid="${escAttr(q.id)}" data-idx="${i}">
+          <div class="impact-left"><span>${o.icon}</span>${esc(o.label)}</div>
+          <div class="impact-right">
+            <span class="prio ${o.priority.toLowerCase()}">${o.priority}</span>
+            <span class="sla-lbl">SLA ${o.sla}</span>
+          </div>
+        </div>`
+      ).join('') + `</div>`;
+      break;
+
+    case 'long_text': {
+      const val = saved ? saved.value : '';
+      // Context-aware placeholder for Q3 in account creation flow
+      let ph = q.placeholder || '';
+      let extraHint = '';
+      if (q.id === 'Q3' && (state.answers['Q11']||{}).value === 'create_new_account') {
+        ph = 'Vui lòng mô tả:\n• Mục đích tạo tài khoản (để làm gì, dùng cho công việc nào?)\n• Phạm vi sử dụng (cá nhân / nhóm / toàn bộ phận?)\n• Thời hạn cần tài khoản\n• Yêu cầu đặc biệt khác (nếu có)';
+        extraHint = `<div class="hint-box" style="margin-bottom:12px">⚠️ Vui lòng ghi rõ <strong>mục đích tạo tài khoản</strong> để ITD có thể xử lý chính xác và đúng SLA.</div>`;
+      }
+      html += extraHint;
+      html += `<textarea class="f-textarea" id="ta-${q.id}" maxlength="${q.maxLen}" placeholder="${esc(ph)}" oninput="onTextInput('${q.id}')">${esc(val)}</textarea>`;
+      html += `<div class="char-row"><span id="cc-${q.id}">${val.length} / ${q.maxLen} ký tự</span></div>`;
+      break;
+    }
+
+    case 'manager_form': {
+      const m = saved || {};
+      html += `<div class="f-fields">
+        <div class="f-field req">
+          <label>Cấp 1 — Quản lý trực tiếp <span style="font-weight:400;color:#888;font-size:12px">(bắt buộc)</span></label>
+          <input type="text" id="mgr-email-1" placeholder="manager1@has.edu.vn; manager2@has.edu.vn" value="${esc(m.manager_email_1||'')}" oninput="onMgrInput()">
+        </div>
+        <div class="f-field">
+          <label>Cấp 2 — Quản lý cấp cao hơn <span style="font-weight:400;color:#888;font-size:12px">(nếu có)</span></label>
+          <input type="text" id="mgr-email-2" placeholder="director@has.edu.vn; vp@has.edu.vn" value="${esc(m.manager_email_2||'')}" oninput="onMgrInput()">
+          <div style="font-size:11px;color:#888;margin-top:4px">Nhiều email cách nhau bằng dấu ";" · Cấp 2 để trống nếu không cần</div>
+        </div>
+        <div class="f-field">
+          <label>Lý do cần xác nhận</label>
+          <textarea id="mgr-reason" rows="4" class="f-textarea" placeholder="Mô tả lý do yêu cầu cần quản lý xác nhận..." oninput="onMgrInput()">${esc(m.manager_reason||'')}</textarea>
+        </div>
+      </div>`;
+      break;
+    }
+
+    case 'user_info_form': {
+      const u = saved || {};
+      html += `<div class="f-fields">
+        <div class="f-row">
+          <div class="f-field req"><label>Họ và tên người dùng</label><input type="text" id="du-name" placeholder="Trần Văn C" value="${esc(u.user_full_name||'')}" oninput="onUserInfoInput()"></div>
+          <div class="f-field"><label>Email cá nhân / công việc</label><input type="email" id="du-email" placeholder="c@gmail.com" value="${esc(u.user_email||'')}" oninput="onUserInfoInput()"></div>
+        </div>
+        <div class="f-field"><label>Bộ phận / Đơn vị</label><input type="text" id="du-dept" placeholder="Phòng Kế toán" value="${esc(u.user_department||'')}" oninput="onUserInfoInput()"></div>
+        <div class="f-field"><label>Ngày bắt đầu cần tài khoản</label><input type="date" id="du-date" value="${esc(u.user_start_date||'')}" oninput="onUserInfoInput()"></div>
+      </div>`;
+      break;
+    }
+
+    case 'account_reg_form': {
+      const r = saved || {};
+      const toolAns = state.answers['Q2'];
+      const toolName = toolAns ? toolAns.label : '';
+      html += `<div class="f-fields">
+        ${toolName ? `<div class="hint-box" style="margin-bottom:14px">🔧 Công cụ cần tạo tài khoản: <strong>${esc(toolName)}</strong></div>` : ''}
+        <div class="f-field"><label>Quyền / Vai trò cần cấp <span style="font-weight:400;color:#aaa">(không bắt buộc)</span></label>
+          <input type="text" id="reg-role" placeholder="VD: Giáo viên, Nhân viên, Admin nhóm..." value="${esc(r.role||'')}" oninput="onAccountRegInput()">
+        </div>
+        <div class="f-field"><label>Nhóm / Lớp / Cơ sở liên quan <span style="font-weight:400;color:#aaa">(không bắt buộc)</span></label>
+          <input type="text" id="reg-group" placeholder="VD: Cơ sở Tây Hồ, Lớp 10A1..." value="${esc(r.group||'')}" oninput="onAccountRegInput()">
+        </div>
+      </div>`;
+      break;
+    }
+
+    case 'file_upload': {
+      const fileCount = state.files.length;
+      html += `<div class="file-drop" id="file-drop-zone" onclick="document.getElementById('file-input').click()" ondragover="fileDragOver(event)" ondragleave="fileDragLeave()" ondrop="fileDrop(event)">
+        <input type="file" id="file-input" accept="${q.accept}" multiple onchange="fileSelect(event)">
+        <div class="file-drop-icon">📎</div>
+        <div class="file-drop-txt">Kéo thả hoặc bấm để chọn file</div>
+        <div class="file-drop-sub">${esc(q.hint)}</div>
+      </div>`;
+      html += `<div class="file-list" id="file-list">` + renderFileList() + `</div>`;
+      if (!q.required) html += `<div class="skip-hint">Không có file đính kèm? Nhấn "Tiếp theo" để bỏ qua</div>`;
+      break;
+    }
+  }
+  return html;
+}
+
+function attachListeners(q) {
+  if (q.type === 'long_text') {
+    const ta = document.getElementById('ta-'+q.id);
+    if (ta && state.answers[q.id]) {
+      // trigger enable check on pre-fill
+      const ev = new Event('input'); ta.dispatchEvent(ev);
+    }
+  }
+  if (q.id === 'Q1') {
+    // Auto-detect MSAL cached account (đăng nhập từ phiên trước)
+    if (!state.user.name) {
+      // Bước 1: thử MSAL cache trước (không cần network)
+      try {
+        const cached = _getMsalApp().getAllAccounts();
+        if (cached.length > 0) {
+          _applyAccountToState(cached[0]);
+          renderQ('Q1');
+          return;
+        }
+      } catch {}
+      // Bước 2: thử Teams SSO → Browser SSO → login button (async, không block UI)
+      setNextEnabled(false);
+      _tryTeamsSSO()
+        .then(ok => ok || _tryBrowserSSO())  // nếu Teams fail → thử browser
+        .then(ok => {
+          if (ok) renderQ('Q1');
+          // Nếu cả hai fail → nút Login vẫn hiển thị, user bấm thủ công
+        });
+      return;
+    }
+    // Đã login → enable Next nếu đã chọn nhóm
+    if (state.answers['Q1']) setNextEnabled(true);
+  }
+  if (q.type === 'manager_form')    { onMgrInput(); }
+  if (q.type === 'user_info_form')  { onUserInfoInput(); }
+  if (q.type === 'account_reg_form'){ onAccountRegInput(); }
+  // restore Next button if answer already saved
+  if (state.answers[q.id] && (q.type === 'choice_grid' || q.type === 'choice_list' || q.type === 'impact')) {
+    setNextEnabled(true);
+  }
+}
+
+// ── Choice selection ────────────────────────────────────────
+function selChoice(qId, idx) {
+  const q = QUESTIONS[qId];
+  document.querySelectorAll('[id^="ci-"]').forEach(e => e.classList.remove('sel'));
+  document.getElementById('ci-'+idx).classList.add('sel');
+  const o = q.options[idx];
+  state.answers[qId] = { label: o.label, value: o.value };
+  setNextEnabled(true);
+}
+function selImpact(qId, idx) { selChoice(qId, idx); }
+
+// ── Text input ──────────────────────────────────────────────
+function onTextInput(qId) {
+  const q  = QUESTIONS[qId];
+  const ta = document.getElementById('ta-'+qId);
+  if (!ta) return;
+  const v = ta.value;
+  const cc = document.getElementById('cc-'+qId);
+  if (cc) cc.textContent = v.length+' / '+q.maxLen+' ký tự';
+  state.answers[qId] = { value: v };
+  setNextEnabled(v.trim().length >= (q.minLen||1));
+}
+
+// ── Manager form ────────────────────────────────────────────
+function onMgrInput() {
+  const raw1   = (document.getElementById('mgr-email-1')||{}).value||'';
+  const raw2   = (document.getElementById('mgr-email-2')||{}).value||'';
+  const reason = (document.getElementById('mgr-reason')||{}).value||'';
+  // Validate: cấp 1 phải có ít nhất 1 email hợp lệ
+  const emails1 = raw1.split(';').map(e=>e.trim().toLowerCase()).filter(Boolean);
+  const emails2 = raw2.split(';').map(e=>e.trim().toLowerCase()).filter(Boolean);
+  const validEmail = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+  const level1ok = emails1.length > 0 && emails1.every(validEmail);
+  const level2ok = emails2.length === 0 || emails2.every(validEmail); // cấp 2 không bắt buộc nhưng nếu nhập phải hợp lệ
+  state.answers['Q5'] = {
+    manager_email_1: emails1.join('; '),
+    manager_email_2: emails2.join('; '),
+    manager_reason:  reason.trim(),
+  };
+  if (level1ok && !level2ok) showToast('Email quản lý cấp 2 không hợp lệ', 'warn');
+  setNextEnabled(level1ok && level2ok);
+}
+
+// ── User info form ──────────────────────────────────────────
+function onUserInfoInput() {
+  const name = (document.getElementById('du-name')||{}).value||'';
+  state.answers['Q14'] = {
+    user_full_name:  name.trim(),
+    user_email:      (document.getElementById('du-email')||{}).value||'',
+    user_department: (document.getElementById('du-dept')||{}).value||'',
+    user_start_date: (document.getElementById('du-date')||{}).value||'',
+  };
+  setNextEnabled(!!(name.trim()));
+}
+
+// ── Account registration form ────────────────────────────────
+function onAccountRegInput() {
+  const role  = (document.getElementById('reg-role')||{}).value||'';
+  const group = (document.getElementById('reg-group')||{}).value||'';
+  state.answers['Q13'] = { role, group };
+  setNextEnabled(true); // công cụ đã chọn ở Q2, Q13 không bắt buộc
+}
+
+// ── File upload ─────────────────────────────────────────────
+function fileSelect(e) {
+  addFiles(Array.from(e.target.files));
+  e.target.value = '';
+}
+function fileDragOver(e) { e.preventDefault(); document.getElementById('file-drop-zone').classList.add('drag'); }
+function fileDragLeave()  { document.getElementById('file-drop-zone').classList.remove('drag'); }
+function fileDrop(e) {
+  e.preventDefault();
+  document.getElementById('file-drop-zone').classList.remove('drag');
+  addFiles(Array.from(e.dataTransfer.files));
+}
+function addFiles(files) {
+  const q = QUESTIONS['Q10'];
+  files.forEach(f => {
+    if (state.files.length >= q.maxFiles) { showToast('Tối đa '+q.maxFiles+' file','error'); return; }
+    if (f.size > q.maxSizeMB*1024*1024) { showToast(f.name+': vượt quá '+q.maxSizeMB+'MB','error'); return; }
+    if (state.files.find(x => x.name===f.name)) { showToast(f.name + ': đã có trong danh sách', 'warn'); }
+    else state.files.push(f);
+  });
+  document.getElementById('file-list').innerHTML = renderFileList();
+  setNextEnabled(true); // optional field, always allow next
+}
+function removeFile(name) {
+  state.files = state.files.filter(f => f.name !== name);
+  document.getElementById('file-list').innerHTML = renderFileList();
+}
+function renderFileList() {
+  return state.files.map(f =>
+    `<div class="file-item">
+      <span>📄</span>
+      <span class="file-item-name">${esc(f.name)}</span>
+      <span class="file-item-size">${fmtSize(f.size)}</span>
+      <span class="file-item-del" data-remove-file="${escAttr(f.name)}">✕</span>
+    </div>`
+  ).join('');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  NAVIGATION                                              ║
+// ╚══════════════════════════════════════════════════════════╝
+function goNext() {
+  const q   = QUESTIONS[state.currentQ];
+  if (!validateCurrent(q)) return;
+
+  // Edit mode: after fixing a question, go back to confirm
+  if (state._editMode) {
+    state._editMode = false;
+    state.history.push(state.currentQ);
+    renderConfirm();
+    return;
+  }
+
+  const nextQ = getNextQ(state.currentQ);
+  if (!nextQ) return;
+
+  state.history.push(state.currentQ);
+  renderQ(nextQ);
+}
+
+function editFromConfirm(qId) {
+  // Clear history từ qId trở đi và xóa answers tương ứng để tránh data mâu thuẫn
+  const idx = state.history.indexOf(qId);
+  if (idx !== -1) {
+    const removed = state.history.splice(idx); // cắt từ qId đến cuối
+    removed.forEach(id => { delete state.answers[id]; });
+  } else {
+    // qId chưa trong history (chưa từng đi qua) — vẫn clear answers nếu có
+    delete state.answers[qId];
+  }
+  state._editMode = true;
+  renderQ(qId);
+}
+
+function goBack() {
+  if (!state.history.length) return;
+  const prev = state.history.pop();
+  // Xóa answer câu hiện tại để tránh data cũ khi đổi hướng flow
+  delete state.answers[state.currentQ];
+  renderQ(prev);
+}
+
+function validateCurrent(q) {
+  if (!q.required && q.type === 'file_upload') return true;
+  const ans = state.answers[q.id];
+
+  switch (q.type) {
+    case 'choice_grid':
+    case 'choice_list':
+    case 'impact':
+      if (!ans || !ans.value) { showToast('Vui lòng chọn một lựa chọn','error'); return false; }
+      break;
+    case 'long_text':
+      if (!ans || (ans.value||'').trim().length < (q.minLen||1)) {
+        showToast('Vui lòng mô tả chi tiết hơn (tối thiểu '+q.minLen+' ký tự)','error'); return false;
+      }
+      break;
+    case 'manager_form':
+      if (!ans || !ans.manager_email_1) {
+        showToast('Vui lòng điền email quản lý cấp 1','error'); return false;
+      }
+      break;
+    case 'user_info_form':
+      if (!ans || !ans.user_full_name) {
+        showToast('Vui lòng điền họ tên người dùng','error'); return false;
+      }
+      break;
+    case 'account_reg_form':
+      break; // không bắt buộc, Q2 đã xử lý tool selection
+  }
+  return true;
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  CONFIRM SCREEN                                          ║
+// ╚══════════════════════════════════════════════════════════╝
+function renderConfirm() {
+  state.currentQ = 'CONFIRM';
+  const rows = buildConfirmRows();
+  const impOpt = getImpactOption();
+  const slot = document.getElementById('q-slot');
+  slot.innerHTML = `
+    <div class="confirm-head">
+      <div class="confirm-icon">📋</div>
+      <div class="confirm-title">Xác nhận thông tin trước khi gửi</div>
+      <div class="confirm-sub">Nhấn ✏️ để sửa từng mục · Nhấn "Gửi yêu cầu" khi đã kiểm tra xong</div>
+    </div>
+    <div class="confirm-table">
+      ${rows.map(r => `
+        <div class="confirm-row">
+          <span class="confirm-key">${r.key}</span>
+          <span class="confirm-val">${r.value}</span>
+          ${r.qId ? `<button class="edit-btn" data-edit-q="${escAttr(r.qId)}" title="Sửa">✏️</button>` : ''}
+        </div>`).join('')}
+    </div>
+    ${impOpt ? `<div class="q-hint" style="margin-top:0">⏱ SLA dự kiến: <strong>${impOpt.sla} làm việc</strong> kể từ khi gửi · Ưu tiên: <strong>${impOpt.priority}</strong></div>` : ''}
+  `;
+  updateProgress(true);
+  updateBreadcrumb();
+  updateNav(null, true);
+}
+
+function buildConfirmRows() {
+  // returns [{key, value, qId}]
+  const rows = [];
+  // Mã nhân viên — luôn hiện riêng nếu có
+  // Người gửi — chỉ hiện nếu đã có tên (sau khi login MS)
+  const senderLabel = [
+    state.user.name,
+    state.user.email ? '&lt;' + esc(state.user.email) + '&gt;' : '',
+  ].filter(Boolean).join(' ');
+  if (senderLabel) rows.push({key:'Người gửi', value: senderLabel, qId:'Q1'});
+  if (state.user.department) rows.push({key:'Bộ phận', value: esc(state.user.department), qId:null});
+
+  const ordered = ['Q1','Q11','Q12','Q13','Q14','Q2','Q3','Q10','Q4','Q5'];
+  ordered.forEach(qId => {
+    if (!state.history.includes(qId)) return;
+    const ans = state.answers[qId];
+    if (!ans) return;
+    const q = QUESTIONS[qId];
+    if (!q) return;
+
+    let value = '';
+    switch (q.type) {
+      case 'choice_grid':
+      case 'choice_list':
+      case 'impact':
+        value = esc(ans.label); break;
+      case 'long_text':
+        value = esc((ans.value||'').substring(0,160) + (ans.value && ans.value.length>160 ? '…' : '')); break;
+      case 'manager_form':
+        value = 'Cấp 1: ' + esc(ans.manager_email_1||'')
+          + (ans.manager_email_2 ? ' · Cấp 2: ' + esc(ans.manager_email_2) : ''); break;
+      case 'user_info_form':
+        value = esc(ans.user_full_name) + (ans.user_department ? ' · ' + esc(ans.user_department) : ''); break;
+      case 'account_reg_form': {
+        value = (ans.role ? esc(ans.role) : '') + (ans.group ? (ans.role ? ' · ' : '') + esc(ans.group) : '') || '(Không có thêm yêu cầu)'; break;
+      }
+    }
+    if (value) rows.push({key: q.badge, value, qId});
+  });
+  if (state.files.length) {
+    rows.push({key:'Tệp đính kèm', value: state.files.map(f => esc(f.name)).join(', '), qId:'Q10'});
+  }
+  return rows;
+}
+
+function getImpactOption() {
+  const ans = state.answers['Q4'];
+  if (!ans) return null;
+  return (QUESTIONS['Q4'].options||[]).find(o => o.value === ans.value) || null;
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  SUBMIT                                                  ║
+// ╚══════════════════════════════════════════════════════════╝
+async function submitForm() {
+  const btn = document.getElementById('btn-next');
+  const txt = document.getElementById('btn-next-text');
+  btn.disabled = true;
+  txt.innerHTML = '<span class="spinner"></span>Đang gửi...';
+
+  try {
+    // Người dùng phải đã đăng nhập (identity lấy từ lúc login, không cần token khi submit)
+    if (!state.user.email) throw new Error('Vui lòng đăng nhập trước khi gửi yêu cầu');
+
+    const payload = buildPayload();
+    if (CONFIG.BACKEND === 'sharepoint') {
+      await sendSP(payload);
+    } else if (CONFIG.BACKEND === 'flow') {
+      if (!CONFIG.ALLOW_FLOW_BACKEND)
+        throw new Error('Flow backend đang bị tắt bởi cấu hình bảo mật (ALLOW_FLOW_BACKEND: false)');
+      await sendViaFlow(payload);
+    } else if (CONFIG.BACKEND === 'googlesheet') {
+      if (!CONFIG.ALLOW_GAS_BACKEND)
+        throw new Error('Google Sheet backend đang bị tắt bởi cấu hình bảo mật (ALLOW_GAS_BACKEND: false)');
+      await sendGAS(payload);
+    } else {
+      throw new Error('CONFIG.BACKEND không hợp lệ: ' + CONFIG.BACKEND);
+    }
+    renderDone(payload.system_fields.ticket_id);
+
+  } catch(e) {
+    btn.disabled = false;
+    txt.textContent = '📤 Gửi yêu cầu';
+    showToast('Lỗi: ' + e.message, 'error');
+  }
+}
+
+function buildPayload() {
+  const impOpt  = getImpactOption();
+  const ans4    = state.answers['Q4'] || {};
+  const status  = ans4.value === 'individual' ? 'submitted' : 'pending_manager_confirmation';
+  const _now = new Date();
+  const _dd  = String(_now.getDate()).padStart(2,'0');
+  const _mm  = String(_now.getMonth()+1).padStart(2,'0');
+  const _yy  = String(_now.getFullYear()).slice(-2);
+  const _seq = Date.now().toString(36).toUpperCase() + Math.random().toString(36).slice(2,5).toUpperCase();
+  const ticketId = CONFIG.ORG_PREFIX + '-' + _dd + _mm + _yy + '-' + _seq;
+  const q1ans   = state.answers['Q1'] || {};
+  const q2ans   = state.answers['Q2'] || {};
+  const q14ans  = state.answers['Q14'] || {};
+
+  // Auto title per rule 9.2
+  let title;
+  if ((state.answers['Q11']||{}).value === 'create_new_account') {
+    title = '[Tạo tài khoản mới] - [' + (q14ans.user_full_name||'') + '] - ' + state.user.name;
+  } else {
+    const tool = (q2ans.label ? ' - ['+q2ans.label+']' : '');
+    title = '[' + (q1ans.label||'') + ']' + tool + ' - ' + state.user.name;
+  }
+
+  const answers = {};
+  Object.keys(state.answers).forEach(qId => {
+    const q   = QUESTIONS[qId];
+    if (!q) return;
+    const ans = state.answers[qId];
+    answers[q.field] = ans;
+  });
+  console.log('[ITD] state.files khi submit:', state.files.length, state.files.map(f=>f.name));
+  if (state.files.length) {
+    answers.attachments = state.files.map(f => ({
+      file_name: f.name, file_size: f.size, file_type: f.type
+    }));
+  }
+
+  return {
+    form_id:   CONFIG.FORM_ID,
+    form_name: 'Đăng ký hỗ trợ dịch vụ',
+    submitted_by: {
+      full_name: state.user.name,
+      email:     state.user.email,
+    },
+    answers,
+    system_fields: {
+      ticket_id:     ticketId,
+      ticket_title:  title,
+      issue_source:  'form',
+      ticket_status: status,
+      priority:      impOpt ? impOpt.priority : 'P3',
+      sla:           impOpt ? impOpt.sla : '24–48h',
+    },
+    routing: {
+      path:            state.history,
+      last_question:   state.history[state.history.length-1] || 'Q4',
+      status:          status,
+    },
+    submitted_at: new Date().toISOString(),
+  };
+}
+
+// ── Gửi phiếu qua SharePoint REST API (miễn phí, không cần Power Automate) ──
+async function sendSP(payload) {
+  const siteUrl = CONFIG.SP_SITE;
+  const listName = CONFIG.SP_LIST;
+
+  // Bước 1: Xác định ListItemEntityTypeFullName (dùng Bearer token qua spFetch)
+  const listMetaRes = await spFetch(
+    siteUrl + "/_api/lists/getByTitle('" + listName + "')?$select=ListItemEntityTypeFullName"
+  );
+  if (!listMetaRes.ok) throw new Error('Không lấy được metadata List (HTTP ' + listMetaRes.status + ')');
+  const listMeta = await listMetaRes.json();
+  const entityType = listMeta.d.ListItemEntityTypeFullName;
+
+  // Token đã có trong spFetch — không cần Request Digest khi dùng Bearer token
+
+  // Bước 3: Map payload → các cột SharePoint
+  const sf  = payload.system_fields;
+  const ans = payload.answers;
+  const sub = payload.submitted_by;
+
+  // Core fields — chắc chắn tồn tại trong SP list
+  const coreItem = {
+    __metadata:        { type: entityType },
+    Title:             sf.ticket_title,
+    ticket_id:         sf.ticket_id,
+    TicketStatus:      sf.ticket_status === 'pending_manager_confirmation' ? 'Cho xac nhan quan ly' : 'Cho tiep nhan',
+    TicketPriority:    sf.priority,
+    sla:               sf.sla || '',
+    submission_time:   payload.submitted_at,
+    submitter_name:    sub.full_name    || '',
+    submitter_email:   sub.email        || '',
+    TicketGroup:       (ans.support_need_group||{}).label      || '',
+    TicketTool:        (ans.support_tool||{}).label            || '',
+    TicketDescription: (ans.request_description||{}).value     || '',
+    TicketImpact:      (ans.impact_scope||{}).label            || '',
+    full_data:         JSON.stringify(payload),
+  };
+
+  // Extended fields — tên cột khớp với internal name trong SP list
+  const extendedFields = {
+    account_issue_type:   (ans.account_login_issue_type||{}).label || '',
+    permission_type:      (ans.permission_request_type||{}).label  || '',
+    // Manager: ManagerEmail (PascalCase) = cấp 1, manager_email (lowercase) = cấp 2
+    ManagerEmail:         (ans.manager_confirmation_info||{}).manager_email_1 || '',
+    manager_email:        (ans.manager_confirmation_info||{}).manager_email_2 || '',
+    manager_reason:       (ans.manager_confirmation_info||{}).manager_reason  || '',
+    // Requester (Q14 — tạo tài khoản cho người khác)
+    requester_name:       (ans.direct_user_info||{}).user_full_name  || '',
+    requester_email:      (ans.direct_user_info||{}).user_email      || '',
+    requester_dept:       (ans.direct_user_info||{}).user_department || '',
+    user_start_date:      (ans.direct_user_info||{}).user_start_date || '',
+    new_account_role:     (ans.account_registration||{}).role        || '',
+    new_account_group:    (ans.account_registration||{}).group       || '',
+  };
+
+  const spPost = async (itemObj) => spFetch(
+    siteUrl + "/_api/lists/getByTitle('" + listName + "')/items",
+    { method: 'POST', headers: { 'Content-Type': 'application/json;odata=verbose' }, body: JSON.stringify(itemObj) }
+  );
+
+  // Bước 2: Thử gửi full (core + extended), nếu 400 thì fallback về core only
+  let res = await spPost({ ...coreItem, ...extendedFields });
+  if (!res.ok && res.status === 400) {
+    const errText = await res.text().catch(() => '');
+    if (errText.includes('InvalidClientQueryException') || errText.includes('property')) {
+      console.warn('[ITD] Extended fields bị từ chối (400) — fallback về core. Kiểm tra tên cột SP.\nChi tiết:', errText.slice(0, 500));
+      res = await spPost(coreItem);
+    }
+  }
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    throw new Error('SharePoint: HTTP ' + res.status + ' — ' + errText.slice(0, 200));
+  }
+
+  // Gửi song song sang SP_LIST_2 (nếu được cấu hình) — lỗi không ảnh hưởng list chính
+  if (CONFIG.SP_LIST_2) {
+    try {
+      const meta2Res = await spFetch(siteUrl + "/_api/lists/getByTitle('" + CONFIG.SP_LIST_2 + "')?$select=ListItemEntityTypeFullName");
+      if (!meta2Res.ok) throw new Error('HTTP ' + meta2Res.status);
+      const entityType2 = (await meta2Res.json()).d.ListItemEntityTypeFullName;
+      const spPost2 = (itemObj) => spFetch(
+        siteUrl + "/_api/lists/getByTitle('" + CONFIG.SP_LIST_2 + "')/items",
+        { method: 'POST', headers: { 'Content-Type': 'application/json;odata=verbose' }, body: JSON.stringify(itemObj) }
+      );
+      let res2 = await spPost2({ ...coreItem, ...extendedFields, __metadata: { type: entityType2 } });
+      if (!res2.ok && res2.status === 400) {
+        const e2 = await res2.text().catch(() => '');
+        if (e2.includes('InvalidClientQueryException') || e2.includes('property')) {
+          console.warn('[ITD] SP_LIST_2: một số cột chưa tồn tại, fallback core fields. Chi tiết:', e2.slice(0, 200));
+          res2 = await spPost2({ ...coreItem, __metadata: { type: entityType2 } });
+        }
+      }
+      if (!res2.ok) console.warn('[ITD] SP_LIST_2 ghi thất bại: HTTP', res2.status);
+      else console.log('[ITD] SP_LIST_2 (' + CONFIG.SP_LIST_2 + ') — ghi thành công');
+    } catch (e2) {
+      console.warn('[ITD] SP_LIST_2 lỗi (không ảnh hưởng list chính):', e2.message);
+    }
+  }
+
+  // Bước 3: Upload file đính kèm lên SP Attachments
+  if (state.files && state.files.length > 0) {
+    const created = await res.json();
+    const itemId  = created.d.Id;
+
+    // Chuẩn hóa tên file sang ASCII thuần (tránh vấn đề encoding URL với tiếng Việt)
+    const sanitizeName = n => {
+      const ext = n.lastIndexOf('.') > 0 ? n.slice(n.lastIndexOf('.')) : '';
+      const base = n.slice(0, n.length - ext.length);
+      const ascii = base
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')  // bỏ dấu
+        .replace(/[đĐ]/g, 'd')
+        .replace(/[~"#%&*:<>?\\/{}|'\s]/g, '_')
+        .replace(/_+/g, '_').trim() || ('file_' + Date.now());
+      return ascii + ext.toLowerCase();
+    };
+
+    const failedFiles = [];
+    for (const f of state.files) {
+      try {
+        const buf      = await f.arrayBuffer();
+        const safeName = sanitizeName(f.name);
+        const attachUrl = siteUrl + "/_api/lists/getByTitle('" + listName
+          + "')/items(" + itemId + ")/AttachmentFiles/add(FileName='" + safeName + "')";
+        const attachRes = await spFetch(attachUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/octet-stream' },
+          body: buf,
+        });
+        if (!attachRes.ok) {
+          const errTxt = await attachRes.text().catch(() => '');
+          const spMsg  = (() => { try { return JSON.parse(errTxt).error?.message?.value || ''; } catch(_){return '';} })();
+          console.error('[ITD] Attach fail', safeName, attachRes.status, spMsg || errTxt.slice(0,300));
+          failedFiles.push(safeName + ' (HTTP ' + attachRes.status + (spMsg ? ': ' + spMsg.slice(0,80) : '') + ')');
+        }
+      } catch(e) {
+        console.error('[ITD] Lỗi đọc file:', f.name, e);
+        failedFiles.push(f.name + ' (đọc file thất bại)');
+      }
+    }
+    if (failedFiles.length > 0) {
+      showToast('File không đính kèm được: ' + failedFiles.join(', '), 'warn');
+    }
+  }
+}
+
+// Đọc File thành base64 an toàn cho file lớn (tránh lỗi call stack khi dùng spread operator)
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || '').split(',')[1] || '');
+    reader.onerror = () => reject(reader.error || new Error('Không đọc được file'));
+    reader.readAsDataURL(file);
+  });
+}
+
+// ── Gửi phiếu qua Power Automate HTTP trigger (flow chạy bằng quyền admin SP) ──
+async function sendViaFlow(payload) {
+  // Lớp bảo vệ thứ 2 (lớp 1 ở submitForm) — ngăn gọi trực tiếp khi flag chưa bật
+  if (!CONFIG.ALLOW_FLOW_BACKEND)
+    throw new Error('Flow backend chưa được bật trong cấu hình bảo mật (ALLOW_FLOW_BACKEND: false)');
+  if (!CONFIG.FLOW_URL) throw new Error('Chưa cấu hình FLOW_URL trong CONFIG');
+  const sf  = payload.system_fields;
+  const ans = payload.answers;
+  const sub = payload.submitted_by;
+
+  // Encode file đính kèm thành base64 để flow tạo SP attachment
+  const sanitizeName = n => {
+    const ext = n.lastIndexOf('.') > 0 ? n.slice(n.lastIndexOf('.')) : '';
+    const base = n.slice(0, n.length - ext.length);
+    const ascii = base
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[đĐ]/g, 'd')
+      .replace(/[~"#%&*:<>?\/{}|'\s]/g, '_')
+      .replace(/_+/g, '_').trim() || ('file_' + Date.now());
+    return ascii + ext.toLowerCase();
+  };
+  const attachments = [];
+  for (const f of (state.files || [])) {
+    try {
+      const b64 = await fileToBase64(f);
+      attachments.push({ name: sanitizeName(f.name), content_base64: b64, type: f.type });
+    } catch(e) { console.warn('[ITD] Không đọc được file:', f.name, e); }
+  }
+
+  const body = {
+    ticket_id:         sf.ticket_id,
+    ticket_title:      sf.ticket_title,
+    submission_time:   payload.submitted_at,
+    submitter_name:    sub.full_name    || '',
+    submitter_email:   sub.email        || '',
+    TicketGroup:       (ans.support_need_group||{}).label  || '',
+    TicketTool:        (ans.support_tool||{}).label        || '',
+    TicketDescription: (ans.request_description||{}).value || '',
+    TicketImpact:      (ans.impact_scope||{}).label        || '',
+    TicketPriority:    sf.priority,
+    sla:               sf.sla || '',
+    attachments,           // [{name, content_base64, type}] — flow dùng để tao SP attachment
+    full_data:         JSON.stringify(payload),
+  };
+
+  const res = await fetch(CONFIG.FLOW_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) {
+    const t = await res.text().catch(() => '');
+    throw new Error('Flow HTTP ' + res.status + ': ' + t.slice(0, 200));
+  }
+}
+
+async function sendGAS(payload) {
+  // Lớp bảo vệ thứ 2 (lớp 1 ở submitForm) — ngăn gọi trực tiếp khi flag chưa bật
+  if (!CONFIG.ALLOW_GAS_BACKEND)
+    throw new Error('Google Sheet backend chưa được bật trong cấu hình bảo mật (ALLOW_GAS_BACKEND: false)');
+  if (!CONFIG.GOOGLE_SCRIPT_URL || CONFIG.GOOGLE_SCRIPT_URL.startsWith('REPLACE')) {
+    throw new Error('Chưa cấu hình GOOGLE_SCRIPT_URL trong CONFIG');
+  }
+  let res;
+  try {
+    res = await fetch(CONFIG.GOOGLE_SCRIPT_URL, {
+      method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify(payload),
+    });
+  } catch(e) {
+    throw new Error('Không thể kết nối Google Script: ' + (e.message||e));
+  }
+  // no-cors trả về opaque response (res.ok === false, status === 0) — không thể đọc body
+  // Nếu fetch không throw → đã gửi được; log warning để debug nếu cần
+  if (res && res.type === 'error') {
+    throw new Error('Google Script trả về lỗi. Kiểm tra GAS deployment và URL.');
+  }
+  console.log('[ITD] sendGAS: request sent (no-cors, response opaque)');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  DONE SCREEN                                             ║
+// ╚══════════════════════════════════════════════════════════╝
+function renderDone(ticketId) {
+  state.currentQ = 'DONE';
+  const impOpt = getImpactOption();
+  const slot   = document.getElementById('q-slot');
+  const ini = initials(state.user.name);
+  slot.innerHTML = `
+    <div class="done-card">
+      <div class="done-id">${esc(ticketId||'')}</div>
+      <div class="done-label">Yêu cầu đã được ghi nhận thành công!</div>
+      <div class="done-msg">
+        ${impOpt ? 'SLA phản hồi dự kiến: <strong>'+impOpt.sla+'</strong> làm việc.' : ''}
+        ${state.answers['Q4'] && state.answers['Q4'].value !== 'individual'
+          ? '<br>Trạng thái: <strong>Đang chờ quản lý xác nhận</strong>.'
+          : '<br>Trạng thái: <strong>Đã tiếp nhận</strong>.'}
+      </div>
+    </div>
+    <div class="user-bar" style="margin-top:14px">
+      <div class="user-av">${ini || '👤'}</div>
+      <div style="flex:1">
+        ${state.user.name  ? `<div class="user-name">${esc(state.user.name)}</div>` : ''}
+        ${state.user.email ? `<div class="user-email">${esc(state.user.email)}</div>` : ''}
+        ${!state.user.name && !state.user.email ? `<div class="user-name" style="color:#888">Đã xác thực thành công</div>` : ''}
+      </div>
+    </div>
+    <div class="confirm-table" style="margin-top:10px">
+      <div class="confirm-row"><span class="confirm-key">Mã phiếu</span><span class="confirm-val" style="font-family:monospace;color:#1a4fa0">${esc(ticketId||'')}</span></div>
+      <div class="confirm-row"><span class="confirm-key">Nhóm yêu cầu</span><span class="confirm-val">${esc((state.answers['Q1']||{}).label||'—')}</span></div>
+      <div class="confirm-row"><span class="confirm-key">Công cụ</span><span class="confirm-val">${esc((state.answers['Q2']||{}).label||'—')}</span></div>
+      ${impOpt ? `<div class="confirm-row"><span class="confirm-key">Mức độ ảnh hưởng</span><span class="confirm-val">${esc(impOpt.label)} · <strong>${impOpt.priority}</strong> · SLA ${impOpt.sla}</span></div>` : ''}
+      <div class="confirm-row"><span class="confirm-key">Thời gian gửi</span><span class="confirm-val">${new Date().toLocaleString('vi-VN')}</span></div>
+    </div>
+    <div style="text-align:center;margin-top:12px;font-size:12px;color:#aaa">ITD sẽ liên hệ qua <strong>${esc(state.user.email)}</strong></div>
+  `;
+  updateProgress(false, true);
+  const nav = document.getElementById('f-nav');
+  nav.innerHTML = `
+    <button class="btn-back" id="btn-back" onclick="showHistoryByEmail()">📋 Yêu cầu đã gửi</button>
+    <button class="btn-next" id="btn-next" onclick="resetForm()" style="flex:1">+ Gửi yêu cầu hỗ trợ mới</button>`;
+  document.getElementById('breadcrumb').innerHTML = '';
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  UI HELPERS                                              ║
+// ╚══════════════════════════════════════════════════════════╝
+function updateProgress(isConfirm, isDone) {
+  const total  = estimateTotalSteps();
+  const visited = state.history.length + (isConfirm||isDone ? 1 : 0);
+  const pct    = isDone ? 100 : Math.min(95, Math.max(5, Math.round((visited/total)*100)));
+  document.getElementById('progress-bar').style.width = pct+'%';
+  const q = QUESTIONS[state.currentQ];
+  const onQ1 = !isConfirm && !isDone && state.currentQ === 'Q1';
+  const stepInfo = document.getElementById('f-step-info');
+  if (stepInfo) stepInfo.style.visibility = onQ1 ? 'hidden' : 'visible';
+  document.getElementById('step-counter').textContent = isDone
+    ? 'Hoàn tất ✓'
+    : (isConfirm ? 'Xác nhận & Gửi' : 'Câu ' + (state.history.length + 1));
+  document.getElementById('step-label').textContent = isDone
+    ? ''
+    : (isConfirm ? 'Kiểm tra thông tin' : (q ? q.badge : ''));
+}
+
+function estimateTotalSteps() {
+  const q1 = (state.answers['Q1']||{}).value;
+  const q11 = (state.answers['Q11']||{}).value;
+  const q4 = (state.answers['Q4']||{}).value;
+  let n = 5; // Q1, Q3, Q10, Q4, confirm
+  if (q1 === 'account_login') {
+    n += 1; // Q11
+    if (q11 === 'create_new_account') n += 2; // Q13, Q14
+    else n += 1; // Q2
+  } else if (q1 === 'permission') {
+    n += 2; // Q12, Q3 path (already counted)
+  } else {
+    n += 1; // Q2
+  }
+  if (!q4 || q4 !== 'individual') n += 1; // Q5 (conditional)
+  return n;
+}
+
+function updateBreadcrumb() {
+  const crumbs = state.history.map(qId => {
+    const ans = state.answers[qId];
+    const q   = QUESTIONS[qId];
+    if (!q || !ans) return null;
+    let label;
+    switch (q.type) {
+      case 'choice_grid':
+      case 'choice_list':
+      case 'impact':
+        label = ans.label; break;
+      case 'long_text': {
+        const v = (ans.value||'');
+        label = v.length > 30 ? v.substring(0,30)+'…' : v;
+        break;
+      }
+      default:
+        label = q.badge;
+    }
+    return label;
+  }).filter(Boolean);
+
+  const bc = document.getElementById('breadcrumb');
+  if (!crumbs.length) { bc.innerHTML = ''; return; }
+  bc.innerHTML = crumbs.map((c,i) =>
+    (i>0?'<span class="bc-sep">›</span>':'')+
+    `<span class="bc-chip">${esc(c)}</span>`
+  ).join('');
+}
+
+function updateNav(q, isConfirm) {
+  const back = document.getElementById('btn-back');
+  const next = document.getElementById('btn-next');
+  const txt  = document.getElementById('btn-next-text');
+  if (!back || !next) return;
+
+  // Khi Q1 chưa login → ẩn cả 2 nút (chỉ có nút login trong card)
+  if (q && q.id === 'Q1' && !state.user.name) {
+    back.style.visibility = 'hidden';
+    next.style.visibility = 'hidden';
+    return;
+  }
+  back.style.visibility = '';
+  next.style.visibility = '';
+
+  back.disabled = state.history.length === 0;
+
+  if (isConfirm) {
+    txt.textContent = '📤 Gửi yêu cầu';
+    next.disabled = false;
+    next.onclick = submitForm;
+  } else {
+    txt.textContent = 'Tiếp theo →';
+    next.onclick = goNext;
+    // file_upload always enabled (optional), others start disabled
+    if (q && q.type === 'file_upload') {
+      next.disabled = false;
+    } else {
+      const hasAns = !!(state.answers[q&&q.id]);
+      next.disabled = !hasAns;
+    }
+  }
+}
+
+function setNextEnabled(v) { document.getElementById('btn-next').disabled = !v; }
+
+function resetForm() {
+  // Giữ lại thông tin user (login MS) — chỉ reset form answers
+  state.currentQ = 'Q1';
+  state.history  = [];
+  state.answers  = {};
+  state.files    = [];
+  // Giữ state.user.name và state.user.email
+  document.getElementById('f-nav').innerHTML = `
+    <button class="btn-back" id="btn-back" onclick="goBack()">← Quay lại</button>
+    <button class="btn-next" id="btn-next" onclick="goNext()" disabled>
+      <span id="btn-next-text">Tiếp theo →</span>
+    </button>`;
+  renderQ('Q1');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  HISTORY SCREEN                                          ║
+// ╚══════════════════════════════════════════════════════════╝
+let _histAll = [];
+
+// ── Status metadata duy nhất — dùng chung cho _renderHistTable + renderTicketModal ──
+// key = giá trị SharePoint (cả có dấu lẫn không dấu) hoặc giá trị logic nội bộ
+const STATUS_META = {
+  'Cho tiep nhan':              { label:'Chờ xử lý',         cls:'sb-new',     color:'#e8b300' },
+  'Chờ tiếp nhận':             { label:'Chờ xử lý',         cls:'sb-new',     color:'#e8b300' },
+  'Dang xu ly':                 { label:'Đang xử lý',       cls:'sb-active',  color:'#3b82f6' },
+  'Đang xử lý':                { label:'Đang xử lý',       cls:'sb-active',  color:'#3b82f6' },
+  'Hoan thanh':                 { label:'Đã xử lý xong',   cls:'sb-done',    color:'#22c55e' },
+  'Hoàn thành':                { label:'Đã xử lý xong',   cls:'sb-done',    color:'#22c55e' },
+  'Da hoan thanh':              { label:'Đã xử lý xong',   cls:'sb-done',    color:'#22c55e' },
+  'Đã hoàn thành':             { label:'Đã xử lý xong',   cls:'sb-done',    color:'#22c55e' },
+  'Cho xac nhan quan ly':       { label:'Chờ xác nhận',    cls:'sb-pending', color:'#f97316' },
+  'Chờ xác nhận quản lý':      { label:'Chờ xác nhận',    cls:'sb-pending', color:'#f97316' },
+  'Tu choi':                    { label:'Từ chối',          cls:'sb-done',    color:'#ef4444' },
+  'Từ chối':                   { label:'Từ chối',          cls:'sb-done',    color:'#ef4444' },
+  submitted:                    { label:'Chờ xử lý',         cls:'sb-new',     color:'#e8b300' },
+  in_progress:                  { label:'Đang xử lý',       cls:'sb-active',  color:'#3b82f6' },
+  pending_manager_confirmation: { label:'Chờ xác nhận',    cls:'sb-pending', color:'#f97316' },
+  resolved:                     { label:'Đã xử lý xong',   cls:'sb-done',    color:'#22c55e' },
+  closed:                       { label:'Đã xử lý xong',   cls:'sb-done',    color:'#9ca3af' },
+};
+const PRIO_META = {
+  P1:{ color:'#ef4444' }, P2:{ color:'#f97316' },
+  P3:{ color:'#6b7280' }, P4:{ color:'#94a3b8' },
+};
+// Fallback khi status SP không khớp bất kỳ key nào trong STATUS_META
+function _resolveStatus(raw) {
+  const s = (raw||'').trim().toLowerCase();
+  if (s.startsWith('dang') || s.startsWith('đang'))       return STATUS_META.in_progress;
+  if (s.startsWith('cho tiep') || s.startsWith('chờ tiếp')) return STATUS_META['Cho tiep nhan'];
+  if (s.startsWith('hoan') || s.startsWith('hoàn'))       return STATUS_META.resolved;
+  if (s.startsWith('cho xac') || s.startsWith('chờ xác')) return STATUS_META['Cho xac nhan quan ly'];
+  if (s.startsWith('tu choi') || s.startsWith('từ chối')) return STATUS_META['Tu choi'];
+  return { label: raw || '', cls: 'sb-new', color: '#6b7280' };
+}
+
+function renderHistory(tickets) {
+  _histAll = tickets.slice().sort((a,b) => new Date(b.submitted_at) - new Date(a.submitted_at));
+  _renderHistTable(_histAll);
+  _updateUserStats();
+}
+
+// Tính 4 chỉ số theo đúng tickets của người dùng hiện tại
+function _updateUserStats() {
+  const sl = s => (s || '').trim().toLowerCase();
+  const IS_DONE = s =>
+    s.startsWith('hoan') || s.startsWith('hoàn') || s.startsWith('đã hoàn') ||
+    s === 'resolved' || s === 'closed' || s === 'da hoan thanh';
+  const IS_ACTIVE = s =>
+    s.startsWith('dang') || s.startsWith('đang') || s === 'in_progress';
+  const IS_PENDING_MGR = s =>
+    s.startsWith('cho xac') || s.startsWith('chờ xác') ||
+    s === 'pending_manager_confirmation';
+
+  let wait = 0, active = 0, pendingMgr = 0, done = 0;
+  _histAll.forEach(t => {
+    const s = sl(t.ticket_status);
+    if      (IS_DONE(s))        done++;
+    else if (IS_ACTIVE(s))      active++;
+    else if (IS_PENDING_MGR(s)) pendingMgr++;
+    else                        wait++; // submitted / Chờ xử lý
+  });
+
+  const setEl = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+  setEl('stat-all',     _histAll.length);
+  setEl('stat-wait',    wait);
+  setEl('stat-active',  active);
+  setEl('stat-pending', pendingMgr);
+  setEl('stat-done',    done);
+}
+
+let _activeStat = 'all';
+function _syncStatFilter() {
+  ['all','wait','active','pending','done'].forEach(c => {
+    const el = document.getElementById('si-' + c);
+    if (el) el.classList.toggle('active-filter', c === _activeStat);
+  });
+}
+function filterByStatCat(cat) {
+  _activeStat = cat;
+  // Visual active state — chỉ duy nhất ô đang active được highlight
+  _syncStatFilter();
+  const sl = s => (s||'').trim().toLowerCase();
+  const IS_DONE    = s => s.startsWith('hoan')||s.startsWith('hoàn')||s==='resolved'||s==='closed'||s==='da hoan thanh';
+  const IS_ACTIVE  = s => s.startsWith('dang')||s.startsWith('đang')||s==='in_progress';
+  const IS_PENDING = s => s.startsWith('cho xac')||s.startsWith('chờ xác')||s==='pending_manager_confirmation';
+  const filtered = cat === 'all' ? _histAll : _histAll.filter(t => {
+    const s = sl(t.ticket_status);
+    if (cat==='done')    return IS_DONE(s);
+    if (cat==='active')  return IS_ACTIVE(s);
+    if (cat==='pending') return IS_PENDING(s);
+    return !IS_DONE(s) && !IS_ACTIVE(s) && !IS_PENDING(s);
+  });
+  _renderHistTable(filtered);
+}
+
+function _renderHistTable(list) {
+  const slot = document.getElementById('q-slot');
+  const count = list.length;
+
+  // Bỏ tên người gửi khỏi tiêu đề (suffix " - {tên}") vì user đang xem yêu cầu của chính mình
+  function cleanIssue(raw) {
+    if (!raw) return '(Không có tiêu đề)';
+    // Trích phần trong ngoặc đầu tiên: [Loại yêu cầu] - [Công cụ] - Tên
+    const m = raw.match(/^\[([^\]]+)\]/);
+    if (m) return m[1];
+    // Fallback: bỏ tên user ở cuối
+    const name = state.user.name;
+    if (name) {
+      const suffix = ' - ' + name;
+      if (raw.endsWith(suffix)) raw = raw.slice(0, -suffix.length).trim();
+    }
+    // Bỏ [Tool] nếu còn sót
+    raw = raw.replace(/\s*-\s*\[[^\]]*\]\s*$/, '').trim();
+    return raw || '(Không có tiêu đề)';
+  }
+  function extractTool(raw) {
+    // Trích [Công cụ] từ dạng [Loại] - [Công cụ] - Tên
+    const m = raw.match(/^\[[^\]]+\]\s*-\s*\[([^\]]+)\]/);
+    return m ? m[1] : '';
+  }
+
+  // Helper: nhãn ưu tiên thân thiện
+  function prioLabel(p) {
+    if (p === 'P1') return 'P1 · Khẩn cấp';
+    if (p === 'P2') return 'P2 · Cao';
+    if (p === 'P3') return 'P3 · Bình thường';
+    return p || '';
+  }
+  // Helper: nút thao tác theo trạng thái
+  function actionBtn(status, ticketId) {
+    const s = (status||'').trim().toLowerCase();
+    const tid = escAttr(ticketId||'');
+    const ds  = escAttr(status||'(empty)'); // debug: xem giá trị thực
+    const icon = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="3"/><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/></svg>`;
+    // Chờ xác nhận quản lý
+    const isPending = s.includes('xac nhan') || s.includes('xác nhận') ||
+                      s.includes('pending') || s === 'pending_manager_confirmation' ||
+                      s.includes('cho xac');
+    // Đang xử lý / In Progress
+    const isActive  = s.startsWith('dang') || s.startsWith('đang') ||
+                      s === 'in_progress'   || s.includes('processing') ||
+                      s.includes('in progress') || s.includes('dang xu ly');
+    // Hoàn thành / Resolved / Closed
+    const isDone    = s.startsWith('hoan') || s.startsWith('hoàn') ||
+                      s === 'resolved'      || s === 'closed' ||
+                      s.includes('hoan thanh') || s.includes('hoàn thành') ||
+                      s.includes('da hoan') || s.includes('đã hoàn') ||
+                      s.includes('done')   || s.includes('complete');
+    if (isPending)
+      return `<button class="btn-confirm" data-ticket-id="${tid}" data-status="${ds}">✔ Xác nhận</button>`;
+    if (isActive)
+      return `<button class="btn-track" data-ticket-id="${tid}" data-status="${ds}">${icon} Theo dõi</button>`;
+    if (isDone)
+      return `<button class="btn-rate" data-ticket-id="${tid}" data-status="${ds}">★ Đánh giá</button>`;
+    return `<button class="btn-xem" data-ticket-id="${tid}" data-status="${ds}">${icon} Xem chi tiết</button>`;
+  }
+
+  let rows = '';
+  if (!count) {
+    rows = `<div class="hist-empty">Chưa có yêu cầu nào.<br>Nhấn "✏️ Gửi yêu cầu hỗ trợ mới" để bắt đầu.</div>`;
+  } else {
+    list.forEach(t => {
+      const date = t.submitted_at
+        ? new Date(t.submitted_at).toLocaleDateString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric'})
+        : '';
+      const issue = cleanIssue(t.ticket_title);
+      const tool  = esc(t.support_tool || extractTool(t.ticket_title || ''));
+      const toolHtml = tool
+        ? `<span class="tool-badge">${tool}</span>`
+        : `<span class="tool-empty">—</span>`;
+      rows += `<div class="hist-tr">
+        <div>${toolHtml}</div>
+        <div>
+          <div class="hist-td-title">${esc(issue)}</div>
+          <div class="hist-td-sub">${esc(t.ticket_id||'')}</div>
+        </div>
+        <div style="font-size:11px;color:#8a90a8;white-space:nowrap">${date}</div>
+        <div class="hist-td-act">${actionBtn(t.ticket_status, t.ticket_id)}</div>
+      </div>`;
+    });
+    rows = `<div class="hist-table-wrap">
+      <div class="hist-thead">
+        <div>Công cụ</div><div>Nội dung yêu cầu</div><div>Ngày tạo</div><div>Thao tác</div>
+      </div>
+      <div class="hist-tbody">${rows}</div>
+    </div>`;
+  }
+
+  // Nếu wrapper đã có → chỉ cập nhật bảng, không re-render greeting/search/input
+  const existingWrap = document.getElementById('hist-table-container');
+  if (existingWrap) {
+    existingWrap.innerHTML = rows;
+    return;
+  }
+
+  // Lần đầu render: dựng toàn bộ layout
+  const greetName = state.user.name
+    ? `Xin chào, ${esc(state.user.name)} 👋`
+    : 'Xin chào 👋';
+
+  slot.innerHTML = `<div class="hist-wrap">
+    <div class="hist-greeting">
+      <div class="hist-greeting-name">${greetName}</div>
+      <div class="hist-greeting-sub">Theo dõi tiến độ xử lý các yêu cầu hỗ trợ CNTT của bạn.</div>
+    </div>
+    <div class="hist-stats-card">
+      <div class="hist-stats-hdr">
+        <span class="hist-stats-title">Tình trạng yêu cầu của bạn</span>
+        <span class="hist-stats-hint">Nhấn vào từng ô để lọc danh sách bên dưới</span>
+      </div>
+      <div class="hist-stats-scroll"><div class="f-stats" id="f-stats">
+        <div class="f-stat-item" onclick="filterByStatCat('all')" id="si-all">
+          <div class="f-stat-num" id="stat-all">—</div>
+          <div class="f-stat-lbl">Tất cả ›</div>
+        </div>
+        <div class="f-stat-item" onclick="filterByStatCat('wait')" id="si-wait">
+          <div class="f-stat-num" id="stat-wait">—</div>
+          <div class="f-stat-lbl"><span class="stat-dot dot-wait">●</span>Chờ xử lý ›</div>
+        </div>
+        <div class="f-stat-item" onclick="filterByStatCat('active')" id="si-active">
+          <div class="f-stat-num" id="stat-active">—</div>
+          <div class="f-stat-lbl"><span class="stat-dot dot-active">●</span>Đang xử lý ›</div>
+        </div>
+        <div class="f-stat-item" onclick="filterByStatCat('pending')" id="si-pending">
+          <div class="f-stat-num" id="stat-pending">—</div>
+          <div class="f-stat-lbl"><span class="stat-dot" style="color:#f97316">●</span>Chờ xác nhận ›</div>
+        </div>
+        <div class="f-stat-item" onclick="filterByStatCat('done')" id="si-done">
+          <div class="f-stat-num" id="stat-done">—</div>
+          <div class="f-stat-lbl"><span class="stat-dot dot-done">●</span>Đã xử lý xong ›</div>
+        </div>
+      </div></div>
+    </div>
+    <div class="hist-panel">
+      <div class="hist-topbar">
+        <div class="hist-search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aab" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="hist-search" id="hist-search-inp"
+            placeholder="Tìm theo mã yêu cầu, nội dung, hệ thống..."
+            oninput="if(!this._composing) filterHist(this.value)"
+            oncompositionstart="this._composing=true"
+            oncompositionend="this._composing=false; filterHist(this.value)">
+        </div>
+        <div class="hist-topbar-btns">
+          <button class="btn-refresh-sm" style="display:inline-flex" onclick="showHistoryByEmail()" title="Cập nhật danh sách">🔄 Cập nhật</button>
+          <button class="btn-new-top" onclick="closeHistory()">✏️ Gửi yêu cầu mới</button>
+        </div>
+      </div>
+      <div class="hist-info-bar">
+        <div class="hist-section-title">Danh sách yêu cầu đã gửi</div>
+        <div class="hist-refresh-info">Cập nhật lúc <span id="hist-refresh-ts">${new Date().toLocaleTimeString('vi-VN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span></div>
+
+      </div>
+      <div id="hist-table-container">${rows}</div>
+    </div>
+  </div>`;
+}
+
+function filterHist(q) {
+  const kw = q.trim().toLowerCase();
+  const filtered = kw
+    ? _histAll.filter(t =>
+        (t.ticket_id||'').toLowerCase().includes(kw) ||
+        (t.ticket_title||'').toLowerCase().includes(kw))
+    : _histAll;
+  _renderHistTable(filtered);
+  // Không cần set lại value/focus — input không bị re-render
+}
+
+function closeHistory() {
+  // Hủy auto-refresh timer khi rời màn hình lịch sử
+  if (_histRefreshTimer)  { clearInterval(_histRefreshTimer);  _histRefreshTimer  = null; }
+  if (_statsRefreshTimer) { clearInterval(_statsRefreshTimer); _statsRefreshTimer = null; }
+  // Khôi phục progress-wrap + breadcrumb
+  document.getElementById('f-progress-wrap').style.display = '';
+  document.getElementById('breadcrumb').style.display = '';
+  // Khôi phục nav
+  document.getElementById('f-nav').style.display = '';
+  // Khôi phục nav chuẩn rồi render Q1 (lúc này state.user.name đã có → hiện form)
+  document.getElementById('f-nav').innerHTML = `
+    <button class="btn-back" id="btn-back" onclick="goBack()">← Quay lại</button>
+    <button class="btn-next" id="btn-next" onclick="goNext()" disabled>
+      <span id="btn-next-text">Tiếp theo →</span>
+    </button>`;
+  // Reset lịch sử navigation về Q1
+  state.history = [];
+  renderQ('Q1');
+}
+
+// ╔══════════════════════════════════════════════════════════╗
+// ║  TICKET DETAIL MODAL                                     ║
+// ╚══════════════════════════════════════════════════════════╝
+let _viewTicketLoading = false; // chống double-click mở nhiều modal
+async function viewTicket(ticketId) {
+  if (!ticketId || _viewTicketLoading) return;
+  _viewTicketLoading = true;
+  // Disable tất cả nút action trong bảng
+  document.querySelectorAll('.btn-xem,.btn-track,.btn-confirm,.btn-rate').forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
+  // Tạo overlay loading trước
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.id = 'ticket-modal';
+  overlay.onclick = (e) => { if (e.target === overlay) closeModal(); };
+  overlay.innerHTML = `<div class="modal-card"><div style="text-align:center;padding:40px;color:#aaa">⏳ Đang tải...</div></div>`;
+  document.body.appendChild(overlay);
+
+  try {
+    // Fetch full_data từ SharePoint: kết hợp ticket_id + submitter_email để ngăn user xem ticket người khác
+    const safeId    = ticketId.replace(/'/g, "''");
+    const safeEmail = (state.user.email || '').replace(/'/g, "''");
+    const filter = encodeURIComponent(
+      "ticket_id eq '" + safeId + "' and submitter_email eq '" + safeEmail + "'"
+    );
+    const select = '$select=Id,ticket_id,Title,TicketStatus,TicketPriority,TicketGroup,TicketTool,TicketImpact,submission_time,submitter_name,submitter_email,sla,full_data';
+    const url = CONFIG.SP_SITE + "/_api/lists/getByTitle('" + CONFIG.SP_LIST + "')/items?$filter=" + filter + '&' + select + '&$top=1';
+    const res = await spFetch(url);
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const item = (data.d?.results || [])[0];
+    if (!item) throw new Error('Không tìm thấy phiếu');
+
+    // Parse full_data nếu có
+    let fullData = null;
+    try { fullData = item.full_data ? JSON.parse(item.full_data) : null; } catch {}
+
+    // Fetch danh sách file đính kèm từ SP
+    let spAttachments = [];
+    try {
+      const attUrl = CONFIG.SP_SITE + "/_api/lists/getByTitle('" + CONFIG.SP_LIST
+        + "')/items(" + item.Id + ")/AttachmentFiles";
+      const attRes = await spFetch(attUrl);
+      if (attRes.ok) {
+        const attJson = await attRes.json();
+        spAttachments = (attJson.d?.results || []);
+      }
+    } catch(e) { console.warn('[ITD] Không fetch được attachment:', e); }
+
+    renderTicketModal(item, fullData, spAttachments);
+  } catch(e) {
+    _viewTicketLoading = false;
+    document.querySelectorAll('.btn-xem,.btn-track,.btn-confirm,.btn-rate').forEach(b => { b.disabled = false; b.style.opacity = ''; });
+    overlay.querySelector('.modal-card').innerHTML = `
+      <div class="modal-head">
+        <span class="modal-head-id">${esc(ticketId)}</span>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal-body"><div style="color:#e55;padding:20px">⚠️ Lỗi: ${esc(e.message)}</div></div>`;
+  }
+}
+
+function renderTicketModal(item, fullData, spAttachments=[]) {
+  const overlay = document.getElementById('ticket-modal');
+  if (!overlay) return;
+
+  // Dùng STATUS_META + PRIO_META khai báo ở module scope (không khai báo lại local)
+  const st   = item.TicketStatus || '';
+  const prio = item.TicketPriority || 'P3';
+  const sm   = STATUS_META[st] || _resolveStatus(st);
+  const pm   = PRIO_META[prio] || { color:'#6b7280' };
+  const dt   = item.submission_time
+    ? new Date(item.submission_time).toLocaleString('vi-VN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})
+    : '—';
+
+  // Lấy thông tin từ full_data nếu có, fallback về SP columns
+  const ans = fullData?.answers || {};
+  const sub = fullData?.submitted_by || {};
+  const sf  = fullData?.system_fields || {};
+
+  // Nhóm rows thông tin
+  const infoRows = [
+    ['Mã phiếu',      item.ticket_id || sf.ticket_id || '—'],
+    ['Thời gian gửi', dt],
+    ['SLA',           item.sla || sf.sla || '—'],
+  ].filter(r => r[1] && r[1] !== '—');
+
+  const submitterRows = [
+    ['Họ tên', item.submitter_name || sub.full_name || '—'],
+    ['Email',  item.submitter_email || sub.email    || '—'],
+  ].filter(r => r[1] && r[1] !== '—');
+
+  const requestRows = [
+    ['Nhóm yêu cầu', item.TicketGroup || (ans.support_need_group||{}).label || '—'],
+    ['Công cụ',      item.TicketTool  || (ans.support_tool||{}).label       || '—'],
+    ['Mức ảnh hưởng',item.TicketImpact|| (ans.impact_scope||{}).label       || '—'],
+  ].filter(r => r[1] && r[1] !== '—');
+
+  // Mô tả chi tiết từ full_data
+  const desc = (ans.request_description||{}).value || '';
+
+  // Thông tin bổ sung từ full_data
+  const extraRows = [];
+  const mgr = ans.manager_confirmation_info || {};
+  if (mgr.manager_email_1) extraRows.push(['Quản lý cấp 1', mgr.manager_email_1]);
+  if (mgr.manager_email_2) extraRows.push(['Quản lý cấp 2', mgr.manager_email_2]);
+  if (mgr.manager_reason)  extraRows.push(['Lý do xác nhận', mgr.manager_reason]);
+  const du = ans.direct_user_info || {};
+  if (du.user_full_name) extraRows.push(['Người dùng cần hỗ trợ', du.user_full_name + (du.user_email ? ' (' + du.user_email + ')' : '')]);
+  const areg = ans.account_registration || {};
+  if (areg.role)  extraRows.push(['Quyền tài khoản', areg.role]);
+  if (areg.group) extraRows.push(['Nhóm / Cơ sở', areg.group]);
+
+  const mkRows = (arr) => arr.map(([k,v]) =>
+    `<div class="modal-row"><span class="modal-key">${esc(k)}</span><span class="modal-val">${esc(v)}</span></div>`
+  ).join('');
+
+  overlay.querySelector('.modal-card').innerHTML = `
+    <div class="modal-head">
+      <span class="modal-head-id">${esc(item.ticket_id || '—')}</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="modal-status-row">
+        <span style="background:${sm.color}1a;color:${sm.color};border:1px solid ${sm.color}44;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700">
+          ${esc(sm.label || st || 'Không rõ')}
+        </span>
+        <span style="background:${pm.color}1a;color:${pm.color};border:1px solid ${pm.color}44;border-radius:20px;padding:3px 12px;font-size:12px;font-weight:700">
+          ${esc(prio)}
+        </span>
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-section-title">Thông tin phiếu</div>
+        ${mkRows(infoRows)}
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-section-title">Người gửi</div>
+        ${mkRows(submitterRows)}
+      </div>
+
+      <div class="modal-section">
+        <div class="modal-section-title">Nội dung yêu cầu</div>
+        ${mkRows(requestRows)}
+        ${desc ? `<div class="modal-row"><span class="modal-key">Mô tả chi tiết</span><span class="modal-val" style="white-space:pre-wrap;line-height:1.6">${esc(desc)}</span></div>` : ''}
+      </div>
+
+      ${extraRows.length ? `<div class="modal-section">
+        <div class="modal-section-title">Thông tin bổ sung</div>
+        ${mkRows(extraRows)}
+      </div>` : ''}
+
+      ${spAttachments.length ? `<div class="modal-section">
+        <div class="modal-section-title">Tệp đính kèm (${spAttachments.length})</div>
+        ${spAttachments.map(a => {
+          const isImg = /\.(jpg|jpeg|png|gif|webp|heic|bmp)$/i.test(a.FileName||'');
+          return `<div class="modal-row" style="align-items:center;gap:8px">
+            <span style="font-size:18px">${isImg ? '🖼️' : '📄'}</span>
+            <a href="${esc(a.ServerRelativeUrl ? 'https://haseduvn.sharepoint.com' + a.ServerRelativeUrl : '#')}"
+               target="_blank" rel="noopener"
+               style="color:#4f46e5;text-decoration:none;font-size:13px;flex:1;word-break:break-all"
+               onmouseover="this.style.textDecoration='underline'" onmouseout="this.style.textDecoration='none'">
+              ${esc(a.FileName||'file')}
+            </a>
+          </div>`;
+        }).join('')}
+      </div>` : ''}
+    </div>`;
+}
+
+function closeModal() {
+  const m = document.getElementById('ticket-modal');
+  if (m) m.remove();
+  _viewTicketLoading = false;
+  document.querySelectorAll('.btn-xem,.btn-track,.btn-confirm,.btn-rate').forEach(b => { b.disabled = false; b.style.opacity = ''; });
+}
+
+// ── Generic helpers ─────────────────────────────────────────
+let _tt;
+function showToast(msg, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show'+(type?' '+type:'');
+  clearTimeout(_tt);
+  _tt = setTimeout(()=>t.classList.remove('show'), 3500);
+}
+function esc(s){ return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// escAttr: dùng riêng cho giá trị trong HTML attribute (data-*, href, value...)
+// Escape thêm single-quote phòng trường hợp attribute không wrap bằng dấu "
+function escAttr(s){ return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;'); }
+function escJs(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/\r?\n/g,' '); }
+function fmtSize(b){ if(b<1024) return b+' B'; if(b<1048576) return Math.round(b/1024)+' KB'; return (b/1048576).toFixed(1)+' MB'; }
+function initials(name) {
+  const p = (name||'').trim().split(' ');
+  return p.length>=2?(p[0][0]+p[p.length-1][0]).toUpperCase():(name||'?').substring(0,2).toUpperCase();
+}
+
+// ── Tự động báo chiều cao cho SharePoint Embed web part ──
+// Khi form thay đổi nội dung (chuyển câu hỏi), postMessage chiều cao thực lên parent
+// Dùng đúng origin của SP thay vì '*' để tránh cross-origin information leak
+const _SP_ORIGIN = (() => { try { return new URL(CONFIG.SP_SITE).origin; } catch{ return '*'; } })();
+function notifyHeight() {
+  if (window.self === window.top) return; // không trong iframe → bỏ qua
+  const h = document.body.scrollHeight;
+  try { window.parent.postMessage({ type:'resize', height: h + 32 }, _SP_ORIGIN); } catch{}
+}
+const _resizeObs = new ResizeObserver(() => notifyHeight());
+_resizeObs.observe(document.body);
+</script>
+
+<!--
+╔══════════════════════════════════════════════════════════════╗
+║  HƯỚNG DẪN TRIỂN KHAI — MSAL.js + GitHub Pages              ║
+╠══════════════════════════════════════════════════════════════╣
+║                                                              ║
+║  BƯỚC 1 — Đăng ký Azure AD App (miễn phí, làm 1 lần)       ║
+║  ─────────────────────────────────────────────────────────  ║
+║  1. Vào https://portal.azure.com                            ║
+║  2. Azure Active Directory → App registrations → New        ║
+║  3. Name: "ITD Support Form"                                ║
+║  4. Supported account types: Accounts in this org only      ║
+║  5. Redirect URI: Single-page application (SPA)             ║
+║     → nhập URL GitHub Pages của form                        ║
+║     VD: https://has-itd.github.io/itd-form/ITD_Support_Form.html║
+║  6. Register → Copy "Application (client) ID"               ║
+║     → dán vào CONFIG.MSAL_CLIENT_ID                         ║
+║  7. Copy "Directory (tenant) ID"                            ║
+║     → dán vào CONFIG.MSAL_TENANT_ID                         ║
+║                                                              ║
+║  BƯỚC 2 — Cấp quyền SharePoint cho App                      ║
+║  ─────────────────────────────────────────────────────────  ║
+║  1. Trong App vừa tạo → API permissions → Add a permission  ║
+║  2. Chọn SharePoint → Delegated permissions                 ║
+║  3. Tích CHỈ: AllSites.Write  (KHÔNG cần AllSites.Read)    ║
+║     AllSites.Write đã đủ để tạo item + đọc item của user   ║
+║  4. Grant admin consent for [tên tổ chức] → Yes             ║
+║                                                              ║
+║  BƯỚC 3 — Cấu hình bảo mật list ITD_Tickets (SP Admin)     ║
+║  ─────────────────────────────────────────────────────────  ║
+║  Bật item-level permission để SP chặn đọc chéo ticket:      ║
+║  Site → ITD_Tickets → List Settings → Advanced Settings     ║
+║  → Read access: "Read items that were created by the user"  ║
+║  → Edit access: "Create items and edit items that were created by the user"                                      ║
+║  IT staff cần quyền "Manage Lists" để xem tất cả ticket.   ║
+║                                                              ║
+║  BƯỚC 4 — Tạo list ITD_QueueStats (thống kê header)        ║
+║  ─────────────────────────────────────────────────────────  ║
+║  Tạo list SharePoint tên "ITD_QueueStats" với 2 cột:       ║
+║    - stat_key  (Single line of text)                        ║
+║    - stat_value (Number)                                    ║
+║  Thêm 3 item: wait / active / done_today                   ║
+║  Cấp quyền Read cho "Everyone except external users"       ║
+║  Dùng Power Automate để cập nhật giá trị khi ticket đổi.  ║
+║                                                              ║
+║  BƯỚC 5 — Deploy lên GitHub Pages (miễn phí)                ║
+║  ─────────────────────────────────────────────────────────  ║
+║  1. Tạo GitHub repo (public hoặc private)                   ║
+║  2. Upload file ITD_Support_Form.html                       ║
+║  3. Settings → Pages → Source: main branch / root           ║
+║  4. URL form: https://[username].github.io/[repo]/ITD_Support_Form.html║
+║                                                              ║
+║  BƯỚC 6 — Cập nhật CONFIG trong file HTML                   ║
+║  ─────────────────────────────────────────────────────────  ║
+║  MSAL_CLIENT_ID:  [Application ID từ Bước 1]               ║
+║  MSAL_TENANT_ID:  [Directory ID từ Bước 1]                 ║
+║  SP_SITE:         'https://haseduvn.sharepoint.com/sites/ITDSupport'║
+║  SP_LIST:         'ITD_Tickets'                             ║
+║  SP_STATS_LIST:   'ITD_QueueStats'                          ║
+║                                                              ║
+║  Cấu hình production (khuyến nghị):                         ║
+║    BACKEND:                       'sharepoint'              ║
+║    SP_STATS_LIST:                 'ITD_QueueStats'          ║
+║    ALLOW_STATS_MAIN_LIST_FALLBACK: false                    ║
+║    ALLOW_FLOW_BACKEND:             false                    ║
+║    ALLOW_GAS_BACKEND:              false                    ║
+║                                                              ║
+║  Cấu hình dev/debug (tạm thời):                             ║
+║    ALLOW_STATS_MAIN_LIST_FALLBACK: true  ← khi QueueStats  ║
+║      chưa setup xong hoặc cần debug stats                  ║
+║    ALLOW_FLOW_BACKEND: true  ← chỉ khi test flow backend   ║
+║    ALLOW_GAS_BACKEND:  true  ← chỉ khi test GAS backend    ║
+║                                                              ║
+║  Lỗi thường gặp:                                            ║
+║  - "redirect_uri_mismatch": URL GitHub Pages chưa thêm      ║
+║    vào Redirect URIs trong Azure AD App                      ║
+║  - "consent_required": chưa Grant admin consent ở Bước 2   ║
+║  - "403 Forbidden SP": user không có quyền Contribute List  ║
+║                                                              ║
+║  OPTION B — Google Apps Script → Google Sheets               ║
+║                                                              ║
+║  1. Mở Google Sheet → Extensions → Apps Script               ║
+║  2. Paste:                                                    ║
+║                                                              ║
+║  function doPost(e) {                                         ║
+║    const d  = JSON.parse(e.postData.contents);               ║
+║    const ss = SpreadsheetApp.getActiveSpreadsheet();         ║
+║    let sh   = ss.ge
