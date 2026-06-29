@@ -404,7 +404,7 @@ function _getMsalApp() {
         authority:   'https://login.microsoftonline.com/' + CONFIG.MSAL_TENANT_ID,
         redirectUri: CONFIG.MSAL_REDIRECT_URI,
       },
-      cache: { cacheLocation: 'sessionStorage' },
+      cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
       system: { allowRedirectInIframe: true },
     });
   }
@@ -582,8 +582,15 @@ const state = {
 // ╔══════════════════════════════════════════════════════════╗
 // ║  BOOT                                                    ║
 // ╚══════════════════════════════════════════════════════════╝
-(function boot() {
+(async function boot() {
+  // Xử lý redirect từ loginRedirect (nếu đang trở về sau đăng nhập)
+  const redirectOk = await _handleMsalRedirect();
   detectUser();
+  if (redirectOk) {
+    showHistoryByEmail();
+    _setupEventListeners();
+    return;
+  }
   renderQ('Q1');
   // Đóng modal bằng phím Escape
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
@@ -604,7 +611,12 @@ const state = {
     const eq = e.target.closest('[data-edit-q]');
     if (eq && eq.dataset.editQ) { editFromConfirm(eq.dataset.editQ); return; }
   });
+  _setupEventListeners();
 })();
+
+function _setupEventListeners() {
+  // Already attached via delegation in boot — no-op if called twice (idempotent guard)
+}
 
 function detectUser() {
   if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.userDisplayName) {
@@ -632,6 +644,20 @@ function _withTimeout(promise, ms) {
     promise,
     new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
   ]);
+}
+
+// Xử lý redirect từ loginRedirect (gọi ngay khi page load)
+async function _handleMsalRedirect() {
+  try {
+    const result = await _getMsalApp().handleRedirectPromise();
+    if (result && result.account) {
+      _applyAccountToState(result.account);
+      return true;
+    }
+  } catch(e) {
+    console.warn('[MSAL] handleRedirectPromise error:', e.errorCode || e.message);
+  }
+  return false;
 }
 
 // Thử tự đăng nhập im lặng qua Microsoft Teams context (max 3s)
@@ -699,24 +725,72 @@ async function _tryBrowserSSO() {
   }
 }
 
-// Đăng nhập Microsoft — gọi từ nút trên Q1 (user gesture → popup hoạt động)
+// Auth via Teams popup (không bị Teams block, không dùng window.open)
+function _teamsAuthPopup() {
+  return new Promise(function(resolve, reject) {
+    var authUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/auth.html';
+    microsoftTeams.authentication.authenticate({
+      url:    authUrl,
+      width:  600,
+      height: 535,
+      successCallback: function(result) {
+        try {
+          var data = JSON.parse(result);
+          state.user.name  = data.name  || '';
+          state.user.email = data.email || '';
+          // Token đã ở trong localStorage → acquireTokenSilent sẽ dùng được
+          var app = _getMsalApp();
+          var accounts = app.getAllAccounts();
+          if (accounts.length > 0) {
+            app.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] })
+              .then(function(r) { _applyAccountToState(r.account); })
+              .catch(function() {})
+              .finally(function() { showHistoryByEmail(); resolve(true); });
+          } else {
+            showHistoryByEmail();
+            resolve(true);
+          }
+        } catch(e) { reject(e); }
+      },
+      failureCallback: function(reason) {
+        reject(new Error(reason));
+      }
+    });
+  });
+}
+
+// Đăng nhập Microsoft — dùng loginRedirect (hoạt động trong iframe/Teams)
 async function msLogin() {
   const btn = document.getElementById('btn-ms-login');
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang đăng nhập...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang chuyển hướng...'; }
+  const msLoginSvg = `<svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Đăng nhập bằng Microsoft`;
+
+  function _restoreBtn() {
+    if (btn) { btn.disabled = false; btn.innerHTML = msLoginSvg; }
+  }
+
+  // Trong Teams desktop: dùng Teams popup auth (không bị chặn)
+  if (_teamsInitialized && typeof microsoftTeams !== 'undefined') {
+    try {
+      await _teamsAuthPopup();
+      return;
+    } catch(e) {
+      _restoreBtn();
+      showToast('Đăng nhập thất bại: ' + (e.errorCode || e.message || e), 'error');
+      return;
+    }
+  }
+
+  // Ngoài Teams: dùng loginRedirect
   try {
     const app = _getMsalApp();
-    const popupReq = { scopes: SP_SCOPES };
-    if (_teamsLoginHint) popupReq.loginHint = _teamsLoginHint;
-    const result = await app.acquireTokenPopup(popupReq);
-    _applyAccountToState(result.account);
-    // Chuyển sang màn hình lịch sử
-    showHistoryByEmail();
+    const req = { scopes: SP_SCOPES, redirectStartPage: window.location.href };
+    if (_teamsLoginHint) req.loginHint = _teamsLoginHint;
+    await app.loginRedirect(req);
+    // loginRedirect navigates away — code below will not run
   } catch(e) {
-    if (btn) {
-      btn.disabled = false;
-      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Đăng nhập bằng Microsoft`;
-    }
-    showToast('Đăng nhập thất bại: ' + (e.message||e), 'error');
+    _restoreBtn();
+    showToast('Đăng nhập thất bại: ' + (e.errorCode || e.message || e), 'error');
   }
 }
 

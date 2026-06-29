@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Đang xác thực...</title>
+  <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
+  <script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; display: flex; align-items: center;
+           justify-content: center; height: 100vh; margin: 0; background: #f3f2f1; }
+    .box { text-align: center; color: #323130; }
+    .spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0;
+               border-top-color: #0078d4; border-radius: 50%;
+               animation: spin .8s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    p { margin: 0; font-size: 14px; color: #605e5c; }
+  </style>
+</head>
+<body>
+<div class="box">
+  <div class="spinner"></div>
+  <p>Đang xác thực với Microsoft...</p>
+</div>
+<script>
+(async function() {
+  // Config — phải khớp với Azure AD app registration
+  var CLIENT_ID  = 'cf3fc815-e55f-45ee-a451-9dc5b0c233aa';
+  var TENANT_ID  = '010a6d4c-53ee-42a6-b68e-74c646a3297c';
+  var SCOPES     = ['https://haseduvn.sharepoint.com/AllSites.Write'];
+  // redirectUri = chính trang auth.html này (không có query/hash)
+  var REDIRECT_URI = location.origin + location.pathname;
+
+  // localStorage → chia sẻ token với main app (cùng origin)
+  var msalApp = new msal.PublicClientApplication({
+    auth: {
+      clientId:    CLIENT_ID,
+      authority:   'https://login.microsoftonline.com/' + TENANT_ID,
+      redirectUri: REDIRECT_URI,
+    },
+    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
+  });
+
+  try {
+    await microsoftTeams.app.initialize();
+  } catch(e) { /* không trong Teams — ok */ }
+
+  try {
+    // Xử lý redirect trả về từ Microsoft
+    var result = await msalApp.handleRedirectPromise();
+    if (result && result.account) {
+      // Token đã lưu vào localStorage → main app đọc được
+      microsoftTeams.authentication.notifySuccess(JSON.stringify({
+        name:  result.account.name  || result.account.username || '',
+        email: (result.account.username || '').toLowerCase(),
+      }));
+      return;
+    }
+
+    // Chưa có redirect result → bắt đầu đăng nhập
+    await msalApp.loginRedirect({ scopes: SCOPES });
+    // loginRedirect sẽ navigate đi — code dưới không chạy
+
+  } catch(e) {
+    console.error('[auth.html]', e);
+    try {
+      microsoftTeams.authentication.notifyFailure(e.errorCode || e.message || String(e));
+    } catch(_) {}
+  }
+})();
+</script>
+</body>
+</html>
