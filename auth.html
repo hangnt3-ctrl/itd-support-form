@@ -7,65 +7,103 @@
   <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
   <script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
   <style>
-    body { font-family: 'Segoe UI', sans-serif; display: flex; align-items: center;
-           justify-content: center; height: 100vh; margin: 0; background: #f3f2f1; }
-    .box { text-align: center; color: #323130; }
+    body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction:column;
+           align-items: center; justify-content: center; height: 100vh;
+           margin: 0; background: #f3f2f1; }
     .spinner { width: 32px; height: 32px; border: 3px solid #e0e0e0;
                border-top-color: #0078d4; border-radius: 50%;
                animation: spin .8s linear infinite; margin: 0 auto 16px; }
     @keyframes spin { to { transform: rotate(360deg); } }
-    p { margin: 0; font-size: 14px; color: #605e5c; }
+    #status { font-size:13px; color:#605e5c; margin-top:8px; text-align:center; max-width:320px; }
+    #err    { color:#d13438; font-size:12px; margin-top:8px; max-width:320px; text-align:center; display:none; }
   </style>
 </head>
 <body>
-<div class="box">
-  <div class="spinner"></div>
-  <p>Đang xác thực với Microsoft...</p>
-</div>
+<div class="spinner" id="spin"></div>
+<div id="status">Đang khởi tạo...</div>
+<div id="err"></div>
 <script>
-(async function() {
-  // Config — phải khớp với Azure AD app registration
-  var CLIENT_ID  = 'cf3fc815-e55f-45ee-a451-9dc5b0c233aa';
-  var TENANT_ID  = '010a6d4c-53ee-42a6-b68e-74c646a3297c';
-  var SCOPES     = ['https://haseduvn.sharepoint.com/AllSites.Write'];
-  // redirectUri = chính trang auth.html này (không có query/hash)
-  var REDIRECT_URI = location.origin + location.pathname;
+var STATUS = document.getElementById('status');
+var ERR    = document.getElementById('err');
+function setStatus(msg) { STATUS.textContent = msg; }
+function setErr(msg) { ERR.style.display='block'; ERR.textContent = msg; document.getElementById('spin').style.display='none'; }
 
-  // localStorage → chia sẻ token với main app (cùng origin)
-  var msalApp = new msal.PublicClientApplication({
-    auth: {
-      clientId:    CLIENT_ID,
-      authority:   'https://login.microsoftonline.com/' + TENANT_ID,
-      redirectUri: REDIRECT_URI,
-    },
-    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
+var CLIENT_ID    = 'cf3fc815-e55f-45ee-a451-9dc5b0c233aa';
+var TENANT_ID    = '010a6d4c-53ee-42a6-b68e-74c646a3297c';
+var SCOPES       = ['https://haseduvn.sharepoint.com/AllSites.Write'];
+var REDIRECT_URI = location.origin + location.pathname; // auth.html URL (no params/hash)
+
+var msalCfg = {
+  auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/' + TENANT_ID, redirectUri: REDIRECT_URI },
+  cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
+};
+
+function notifyOk(account) {
+  setStatus('Đăng nhập thành công, đang đóng...');
+  var payload = JSON.stringify({
+    name:  account.name  || account.username || '',
+    email: (account.username || '').toLowerCase(),
   });
+  try { microsoftTeams.authentication.notifySuccess(payload); }
+  catch(e) { setErr('notifySuccess lỗi: ' + e.message); }
+}
 
+function notifyFail(reason) {
+  try { microsoftTeams.authentication.notifyFailure(reason); }
+  catch(e) { setErr('notifyFailure lỗi: ' + e.message + ' / orig: ' + reason); }
+}
+
+(async function() {
+  // 1. Khởi tạo Teams SDK (bắt buộc trước khi gọi notify*)
+  setStatus('Kết nối Teams SDK...');
   try {
     await microsoftTeams.app.initialize();
-  } catch(e) { /* không trong Teams — ok */ }
+    setStatus('Teams SDK sẵn sàng');
+  } catch(e) {
+    setErr('Teams SDK init lỗi: ' + (e.message || e));
+    return; // không thể notify nếu SDK không init được
+  }
 
+  // 2. Khởi tạo MSAL
+  setStatus('Khởi tạo MSAL...');
+  var msalApp;
+  try { msalApp = new msal.PublicClientApplication(msalCfg); }
+  catch(e) { notifyFail('msal_init: ' + e.message); return; }
+
+  // 3. Xử lý redirect trả về từ Microsoft (nếu có)
+  setStatus('Kiểm tra redirect...');
   try {
-    // Xử lý redirect trả về từ Microsoft
-    var result = await msalApp.handleRedirectPromise();
-    if (result && result.account) {
-      // Token đã lưu vào localStorage → main app đọc được
-      microsoftTeams.authentication.notifySuccess(JSON.stringify({
-        name:  result.account.name  || result.account.username || '',
-        email: (result.account.username || '').toLowerCase(),
-      }));
+    var redirectResult = await msalApp.handleRedirectPromise();
+    if (redirectResult && redirectResult.account) {
+      setStatus('Xử lý redirect thành công');
+      notifyOk(redirectResult.account);
       return;
     }
-
-    // Chưa có redirect result → bắt đầu đăng nhập
-    await msalApp.loginRedirect({ scopes: SCOPES });
-    // loginRedirect sẽ navigate đi — code dưới không chạy
-
   } catch(e) {
-    console.error('[auth.html]', e);
-    try {
-      microsoftTeams.authentication.notifyFailure(e.errorCode || e.message || String(e));
-    } catch(_) {}
+    // redirect error — thử ssoSilent bên dưới
+    setStatus('Redirect error: ' + (e.errorCode || e.message));
+  }
+
+  // 4. Thử ssoSilent (dùng session Microsoft của Teams WebView)
+  setStatus('Thử đăng nhập im lặng...');
+  try {
+    var ssoResult = await msalApp.ssoSilent({ scopes: SCOPES });
+    if (ssoResult && ssoResult.account) {
+      setStatus('Đăng nhập im lặng thành công');
+      notifyOk(ssoResult.account);
+      return;
+    }
+  } catch(ssoErr) {
+    setStatus('Cần đăng nhập tương tác: ' + (ssoErr.errorCode || ssoErr.message));
+  }
+
+  // 5. Fallback: loginRedirect (popup navigate đến MS login)
+  setStatus('Chuyển hướng đến Microsoft...');
+  try {
+    await msalApp.loginRedirect({ scopes: SCOPES });
+    // loginRedirect navigates away — code below will not run
+  } catch(e) {
+    notifyFail('login_redirect: ' + (e.errorCode || e.message || e));
   }
 })();
 </script>
