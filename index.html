@@ -585,6 +585,24 @@ const state = {
 (async function boot() {
   // Xử lý redirect từ loginRedirect (nếu đang trở về sau đăng nhập)
   const redirectOk = await _handleMsalRedirect();
+
+  // Nếu đang chạy trong Teams auth popup: notify rồi đóng
+  if (redirectOk && _isTeamsAuthPopup()) {
+    try {
+      await microsoftTeams.app.initialize();
+      const acc = _getMsalApp().getAllAccounts()[0] || {};
+      microsoftTeams.authentication.notifySuccess(JSON.stringify({
+        name:  acc.name  || acc.username || '',
+        email: (acc.username || '').toLowerCase(),
+      }));
+    } catch(e) {
+      // Nếu không notify được thì vẫn render bình thường
+      showHistoryByEmail();
+      _setupEventListeners();
+    }
+    return;
+  }
+
   detectUser();
   if (redirectOk) {
     showHistoryByEmail();
@@ -725,31 +743,54 @@ async function _tryBrowserSSO() {
   }
 }
 
-// Auth via Teams popup — Teams SDK v2: authenticate() trả về Promise
+// Auth via Teams popup — dùng login.microsoftonline.com trực tiếp (domain Teams tin tưởng)
+// Sau khi auth, MS redirect về main app URL, _handleMsalRedirect xử lý token
+// Main app khi chạy trong popup sẽ gọi notifySuccess rồi đóng window
 function _teamsAuthPopup() {
-  var authUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/auth.html';
+  // Xây dựng auth URL trực tiếp (không qua auth.html)
+  var app = _getMsalApp();
+  // Dùng MSAL internal để lấy URL — fallback sang manual build nếu cần
+  var redirectUri = 'https://hangnt3-ctrl.github.io/itd-support-form/';
+  var authUrl = 'https://login.microsoftonline.com/' + CONFIG.MSAL_TENANT_ID +
+    '/oauth2/v2.0/authorize' +
+    '?client_id=' + encodeURIComponent(CONFIG.MSAL_CLIENT_ID) +
+    '&response_type=code' +
+    '&redirect_uri=' + encodeURIComponent(redirectUri) +
+    '&scope=' + encodeURIComponent(SP_SCOPES.join(' ') + ' openid profile offline_access') +
+    '&response_mode=fragment' +
+    '&prompt=select_account' +
+    '&state=teams_popup' +
+    '&nonce=' + Math.random().toString(36).slice(2, 18);
+
   return microsoftTeams.authentication.authenticate({
     url:    authUrl,
     width:  600,
     height: 535,
   }).then(function(resultStr) {
-    // resultStr là chuỗi được truyền vào notifySuccess
+    // notifySuccess được gọi bởi main app khi detect chạy trong popup
     try {
       var data = JSON.parse(resultStr);
       state.user.name  = data.name  || '';
       state.user.email = data.email || '';
     } catch(e) {}
-    // Token đã lưu vào localStorage bởi auth.html
-    var app = _getMsalApp();
-    var accounts = app.getAllAccounts();
+    var msApp = _getMsalApp();
+    var accounts = msApp.getAllAccounts();
     if (accounts.length > 0) {
-      return app.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] })
+      return msApp.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] })
         .then(function(r) { _applyAccountToState(r.account); })
         .catch(function() {})
         .then(function() { showHistoryByEmail(); });
     }
     showHistoryByEmail();
   });
+}
+
+// Kiểm tra xem app đang chạy trong Teams auth popup (window.opener tồn tại và có state=teams_popup)
+function _isTeamsAuthPopup() {
+  try {
+    var hash = window.location.hash || window.location.search;
+    return window.opener && hash && (hash.includes('state=teams_popup') || hash.includes('code='));
+  } catch(e) { return false; }
 }
 
 // Đăng nhập Microsoft — dùng loginRedirect (hoạt động trong iframe/Teams)
