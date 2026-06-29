@@ -405,6 +405,7 @@ function _getMsalApp() {
         redirectUri: CONFIG.MSAL_REDIRECT_URI,
       },
       cache: { cacheLocation: 'sessionStorage' },
+      system: { allowRedirectInIframe: true },
     });
   }
   return _msalApp;
@@ -622,8 +623,8 @@ function _applyAccountToState(account) {
 
 
 // ── Teams SSO + Browser SSO ──────────────────────────────────────────────────
-let _teamsLoginHint = '';     // email lấy từ Teams context
-let _teamsInitialized = false;
+var _teamsLoginHint = '';     // email lấy từ Teams context
+var _teamsInitialized = false;
 
 // Helper: race một promise với timeout
 function _withTimeout(promise, ms) {
@@ -690,7 +691,10 @@ async function _tryBrowserSSO() {
     console.log('[Browser SSO] ssoSilent ✓');
     return true;
   } catch(e) {
-    console.warn('[Browser SSO] fail:', e.errorCode || e.message || e);
+    // block_iframe_reload = MSAL chủ động chặn để tránh vòng lặp iframe — bình thường
+    if (e.errorCode !== 'block_iframe_reload') {
+      console.warn('[Browser SSO] fail:', e.errorCode || e.message || e);
+    }
     return false;
   }
 }
@@ -2366,6 +2370,7 @@ function initials(name) {
 // Dùng đúng origin của SP thay vì '*' để tránh cross-origin information leak
 const _SP_ORIGIN = (() => { try { return new URL(CONFIG.SP_SITE).origin; } catch{ return '*'; } })();
 function notifyHeight() {
+  if (window.self === window.top) return; // không trong iframe → bỏ qua
   const h = document.body.scrollHeight;
   try { window.parent.postMessage({ type:'resize', height: h + 32 }, _SP_ORIGIN); } catch{}
 }
