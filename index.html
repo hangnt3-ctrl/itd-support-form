@@ -657,13 +657,22 @@ function _broadcastAuthDone() {
   // Nếu đang chạy trong popup standalone (itd_popup=1): đăng nhập rồi đóng
   if (_isLoginPopupMode()) {
     if (redirectOk) {
-      // Vừa hoàn tất loginRedirect — broadcast và đóng
+      // Vừa hoàn tất loginRedirect — broadcast để Teams iframe biết
       _broadcastAuthDone();
-      document.body.innerHTML = '<div style="font-family:Segoe UI,sans-serif;text-align:center;padding:60px 24px;color:#323130">' +
-        '<div style="font-size:32px;margin-bottom:16px">✅</div>' +
-        '<p style="font-size:16px;font-weight:600;margin:0 0 8px">Đăng nhập thành công!</p>' +
-        '<p style="font-size:13px;color:#605e5c;margin:0">Cửa sổ này sẽ tự đóng...</p></div>';
-      setTimeout(function(){ try { window.close(); } catch(e){} }, 2000);
+      // Render full form trong tab này (user có thể dùng luôn nếu sync về iframe thất bại)
+      detectUser();
+      showHistoryByEmail();
+      _setupEventListeners();
+      // Cũng hiện banner nhắc quay lại Teams
+      setTimeout(function() {
+        var banner = document.createElement('div');
+        banner.style.cssText = 'position:fixed;bottom:16px;left:50%;transform:translateX(-50%);' +
+          'background:#107c10;color:#fff;padding:10px 20px;border-radius:8px;' +
+          'font-family:Segoe UI,sans-serif;font-size:13px;z-index:9999;box-shadow:0 4px 12px rgba(0,0,0,.2)';
+        banner.textContent = '✓ Đăng nhập thành công! Quay lại Teams và nhấn "Làm mới".';
+        document.body.appendChild(banner);
+        setTimeout(function(){ try { banner.remove(); } catch(e){} }, 8000);
+      }, 500);
       return;
     }
     // Chưa đăng nhập — tự động bắt đầu loginRedirect
@@ -820,12 +829,13 @@ async function _tryBrowserSSO() {
 // Popup ghi token vào localStorage, broadcast về iframe qua BroadcastChannel
 function _openLoginPopup() {
   var popupUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/?itd_popup=1';
-  _authResolved = false; // reset guard
+  _authResolved = false;
   var w = null;
-  try { w = window.open(popupUrl, 'itd_login', 'width=520,height=640,left=200,top=100'); } catch(e) {}
+  // Không dùng size params → Teams mở dưới dạng tab trong WKWebView (cùng process, cùng localStorage)
+  try { w = window.open(popupUrl, '_blank'); } catch(e) {}
   if (w) {
-    _startAuthBCListener(); // BroadcastChannel (nếu cùng context)
-    _startAuthPoller();     // localStorage poll (fallback)
+    _startAuthBCListener();
+    _startAuthPoller();
     return true;
   }
   return false;
@@ -852,9 +862,23 @@ async function msLogin() {
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang mở cửa sổ đăng nhập...'; }
     const popupOk = _openLoginPopup();
     if (popupOk) {
-      // Popup mở thành công — đang chờ broadcast từ popup
       _restoreBtn();
-      showToast('Cửa sổ đăng nhập đã mở. Vui lòng đăng nhập rồi quay lại đây.', 'info');
+      // Hiển thị hướng dẫn + nút Làm mới (phòng khi BroadcastChannel/polling không hoạt động)
+      var slot = document.getElementById('q-slot');
+      if (slot) {
+        var existingMsg = slot.querySelector('.itd-popup-msg');
+        if (!existingMsg) {
+          var msgDiv = document.createElement('div');
+          msgDiv.className = 'itd-popup-msg';
+          msgDiv.style.cssText = 'background:#fff8e1;border:1px solid #f9a825;border-radius:8px;' +
+            'padding:16px;margin-top:16px;font-family:Segoe UI,sans-serif;font-size:13px;text-align:center';
+          msgDiv.innerHTML = '<p style="margin:0 0 12px;color:#323130">⏳ Đang chờ đăng nhập từ cửa sổ mới...<br>' +
+            '<span style="color:#605e5c;font-size:12px">Sau khi đăng nhập xong, trang này sẽ tự cập nhật.</span></p>' +
+            '<button onclick="window.location.reload()" style="background:#0078d4;color:#fff;border:none;' +
+            'border-radius:6px;padding:8px 20px;cursor:pointer;font-size:13px">↻ Làm mới trang</button>';
+          slot.appendChild(msgDiv);
+        }
+      }
     } else {
       // window.open bị chặn — hiển thị link để user click thủ công
       _restoreBtn();
