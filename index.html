@@ -582,29 +582,77 @@ const state = {
 // ╔══════════════════════════════════════════════════════════╗
 // ║  BOOT                                                    ║
 // ╚══════════════════════════════════════════════════════════╝
+// ── Auth qua popup + BroadcastChannel (cho Teams deep-iframe) ──────────────────
+var _authBCListener = null;
+
+function _startAuthBCListener() {
+  if (typeof BroadcastChannel === 'undefined') return;
+  try {
+    if (_authBCListener) { _authBCListener.close(); }
+    _authBCListener = new BroadcastChannel('itd_auth');
+    _authBCListener.onmessage = function(e) {
+      if (!e.data || e.data.type !== 'auth_done') return;
+      _authBCListener.close(); _authBCListener = null;
+      // Token đã được popup ghi vào localStorage (cùng origin)
+      var accounts = _getMsalApp().getAllAccounts();
+      if (accounts.length > 0) {
+        _applyAccountToState(accounts[0]);
+        _getMsalApp().acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] })
+          .catch(function(){})
+          .finally(function(){ showHistoryByEmail(); });
+      } else if (e.data.email) {
+        state.user.name  = e.data.name  || '';
+        state.user.email = e.data.email || '';
+        showHistoryByEmail();
+      }
+    };
+  } catch(er) {}
+}
+
+// Phát broadcast "auth_done" (gọi từ popup sau khi loginRedirect thành công)
+function _broadcastAuthDone() {
+  if (typeof BroadcastChannel === 'undefined') return;
+  try {
+    var bc = new BroadcastChannel('itd_auth');
+    var accounts = _getMsalApp().getAllAccounts();
+    var acc = accounts[0] || {};
+    bc.postMessage({
+      type:  'auth_done',
+      name:  acc.name  || acc.username || '',
+      email: (acc.username || '').toLowerCase(),
+    });
+    bc.close();
+  } catch(er) {}
+}
+
 (async function boot() {
   // Xử lý redirect từ loginRedirect (nếu đang trở về sau đăng nhập)
   const redirectOk = await _handleMsalRedirect();
 
-  // Nếu đang chạy trong Teams auth popup: notify rồi đóng
-  if (redirectOk && _isTeamsAuthPopup()) {
+  // Nếu đang chạy trong popup standalone (itd_popup=1): đăng nhập rồi đóng
+  if (_isLoginPopupMode()) {
+    if (redirectOk) {
+      // Vừa hoàn tất loginRedirect — broadcast và đóng
+      _broadcastAuthDone();
+      document.body.innerHTML = '<div style="font-family:Segoe UI,sans-serif;text-align:center;padding:60px 24px;color:#323130">' +
+        '<div style="font-size:32px;margin-bottom:16px">✅</div>' +
+        '<p style="font-size:16px;font-weight:600;margin:0 0 8px">Đăng nhập thành công!</p>' +
+        '<p style="font-size:13px;color:#605e5c;margin:0">Cửa sổ này sẽ tự đóng...</p></div>';
+      setTimeout(function(){ try { window.close(); } catch(e){} }, 2000);
+      return;
+    }
+    // Chưa đăng nhập — tự động bắt đầu loginRedirect
     try {
-      await microsoftTeams.app.initialize();
-      const acc = _getMsalApp().getAllAccounts()[0] || {};
-      microsoftTeams.authentication.notifySuccess(JSON.stringify({
-        name:  acc.name  || acc.username || '',
-        email: (acc.username || '').toLowerCase(),
-      }));
+      await _getMsalApp().loginRedirect({ scopes: SP_SCOPES });
     } catch(e) {
-      // Nếu không notify được thì vẫn render bình thường
-      showHistoryByEmail();
-      _setupEventListeners();
+      document.body.innerHTML = '<div style="font-family:Segoe UI,sans-serif;padding:24px;color:#d13438">Lỗi: ' + (e.message||e) + '</div>';
     }
     return;
   }
 
   detectUser();
   if (redirectOk) {
+    _broadcastAuthDone(); // Thông báo cho Teams iframe đang chờ (nếu có)
     showHistoryByEmail();
     _setupEventListeners();
     return;
@@ -743,53 +791,25 @@ async function _tryBrowserSSO() {
   }
 }
 
-// Auth via Teams popup — dùng login.microsoftonline.com trực tiếp (domain Teams tin tưởng)
-// Sau khi auth, MS redirect về main app URL, _handleMsalRedirect xử lý token
-// Main app khi chạy trong popup sẽ gọi notifySuccess rồi đóng window
-function _teamsAuthPopup() {
-  // Xây dựng auth URL trực tiếp (không qua auth.html)
-  var app = _getMsalApp();
-  // Dùng MSAL internal để lấy URL — fallback sang manual build nếu cần
-  var redirectUri = 'https://hangnt3-ctrl.github.io/itd-support-form/';
-  var authUrl = 'https://login.microsoftonline.com/' + CONFIG.MSAL_TENANT_ID +
-    '/oauth2/v2.0/authorize' +
-    '?client_id=' + encodeURIComponent(CONFIG.MSAL_CLIENT_ID) +
-    '&response_type=code' +
-    '&redirect_uri=' + encodeURIComponent(redirectUri) +
-    '&scope=' + encodeURIComponent(SP_SCOPES.join(' ') + ' openid profile offline_access') +
-    '&response_mode=fragment' +
-    '&prompt=select_account' +
-    '&state=teams_popup' +
-    '&nonce=' + Math.random().toString(36).slice(2, 18);
-
-  return microsoftTeams.authentication.authenticate({
-    url:    authUrl,
-    width:  600,
-    height: 535,
-  }).then(function(resultStr) {
-    // notifySuccess được gọi bởi main app khi detect chạy trong popup
-    try {
-      var data = JSON.parse(resultStr);
-      state.user.name  = data.name  || '';
-      state.user.email = data.email || '';
-    } catch(e) {}
-    var msApp = _getMsalApp();
-    var accounts = msApp.getAllAccounts();
-    if (accounts.length > 0) {
-      return msApp.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] })
-        .then(function(r) { _applyAccountToState(r.account); })
-        .catch(function() {})
-        .then(function() { showHistoryByEmail(); });
-    }
-    showHistoryByEmail();
-  });
+// Mở popup đăng nhập độc lập (thoát khỏi iframe, dùng loginRedirect bình thường)
+// Popup ghi token vào localStorage, broadcast về iframe qua BroadcastChannel
+function _openLoginPopup() {
+  var popupUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/?itd_popup=1';
+  // Thử window.open (user gesture — có thể bypass block)
+  var w = null;
+  try { w = window.open(popupUrl, 'itd_login', 'width=520,height=640,left=200,top=100'); } catch(e) {}
+  if (w) {
+    _startAuthBCListener();
+    return true; // popup mở được
+  }
+  return false; // popup bị chặn — fallback về link
 }
 
-// Kiểm tra xem app đang chạy trong Teams auth popup (window.opener tồn tại và có state=teams_popup)
-function _isTeamsAuthPopup() {
+// Kiểm tra xem app đang chạy trong popup standalone (không phải iframe)
+function _isLoginPopupMode() {
   try {
-    var hash = window.location.hash || window.location.search;
-    return window.opener && hash && (hash.includes('state=teams_popup') || hash.includes('code='));
+    return window.location.search.includes('itd_popup=1') ||
+           window.location.hash.includes('itd_popup=1');
   } catch(e) { return false; }
 }
 
@@ -802,24 +822,25 @@ async function msLogin() {
   const inIframe = window.self !== window.top;
 
   if (inIframe) {
-    // Trong iframe (SharePoint/Teams): KHÔNG dùng loginRedirect — sẽ bị chặn → blank screen
-    // Chỉ dùng Teams popup API
+    // Trong iframe: loginRedirect bị chặn, Teams SDK timeout → dùng popup window riêng
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang mở cửa sổ đăng nhập...'; }
-    try {
-      if (!_teamsInitialized && typeof microsoftTeams !== 'undefined') {
-        await _withTimeout(microsoftTeams.app.initialize(), 3000);
-        _teamsInitialized = true;
-      }
-      if (!_teamsInitialized) throw new Error('not_in_teams');
-      await _teamsAuthPopup();
-    } catch(e) {
+    const popupOk = _openLoginPopup();
+    if (popupOk) {
+      // Popup mở thành công — đang chờ broadcast từ popup
       _restoreBtn();
-      const msg = String(e.message || e);
-      if (msg === 'not_in_teams') {
-        showToast('Vui lòng mở ứng dụng trực tiếp trong trình duyệt để đăng nhập.', 'info');
-      } else {
-        showToast('Đăng nhập thất bại: ' + msg, 'error');
-      }
+      showToast('Cửa sổ đăng nhập đã mở. Vui lòng đăng nhập rồi quay lại đây.', 'info');
+    } else {
+      // window.open bị chặn — hiển thị link để user click thủ công
+      _restoreBtn();
+      const popupUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/?itd_popup=1';
+      _startAuthBCListener();
+      showToast(
+        '<a href="' + popupUrl + '" target="_blank" ' +
+        'style="color:#fff;text-decoration:underline;font-weight:600" ' +
+        'onclick="event.stopPropagation()">Nhấn đây để mở cửa sổ đăng nhập ↗</a>' +
+        ' (sau khi đăng nhập xong, quay lại trang này)',
+        'info', 20000
+      );
     }
     return; // NEVER fall through to loginRedirect when in iframe
   }
