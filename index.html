@@ -385,6 +385,9 @@ const CONFIG = {
   MSAL_TENANT_ID: '010a6d4c-53ee-42a6-b68e-74c646a3297c', // Directory (tenant) ID
   // Redirect URI: URL trang này sau khi deploy lên GitHub Pages
   // VD: https://has-itd.github.io/itd-support/ITD_Support_Form.html
+  // Khi host trên SharePoint Site Assets: URL tự động = SP URL (cùng origin)
+  // Khi host trên GitHub Pages: URL = GitHub Pages URL
+  // → loginRedirect từ SharePoint không bị Teams chặn (SharePoint→Microsoft trusted)
   MSAL_REDIRECT_URI: window.location.href.split('?')[0].split('#')[0],
 
   ORG_PREFIX: 'ITD',
@@ -405,7 +408,9 @@ function _getMsalApp() {
         redirectUri: CONFIG.MSAL_REDIRECT_URI,
       },
       cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
-      system: { allowRedirectInIframe: true },
+      system: {
+        allowRedirectInIframe: true, // Cho phép redirect ngay trong iframe (SharePoint embed)
+      },
     });
   }
   return _msalApp;
@@ -888,13 +893,15 @@ async function msLogin() {
   function _restoreBtn() { if (btn) { btn.disabled = false; btn.innerHTML = msLoginSvg; } }
 
   const inIframe = window.self !== window.top;
-  // Phân biệt iframe 1 cấp (Teams Website tab) vs 2+ cấp (SharePoint embed)
-  // Ở 1 cấp: parent === top → loginRedirect có thể hoạt động trong Teams Website tab
-  // Ở 2+ cấp: parent !== top → loginRedirect bị Teams/SharePoint chặn → cần popup
+  // Khi host trên SharePoint (cùng origin), Teams không chặn redirect SharePoint→Microsoft
+  // Khi host trên GitHub Pages (cross-origin), Teams chặn → cần popup
+  const isSharePointHost = window.location.hostname.endsWith('.sharepoint.com');
+  // Iframe sâu (2+ cấp) trên GitHub Pages: dùng popup. Tất cả trường hợp khác: loginRedirect
   const isDeepIframe = inIframe && (window.parent !== window.top);
+  const needsPopup = inIframe && isDeepIframe && !isSharePointHost;
 
-  if (inIframe && isDeepIframe) {
-    // Trong iframe sâu (SharePoint embed): loginRedirect bị chặn → dùng popup window riêng
+  if (needsPopup) {
+    // Trong iframe sâu trên GitHub Pages: loginRedirect bị chặn → dùng popup window riêng
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang mở cửa sổ đăng nhập...'; }
     const popupOk = _openLoginPopup();
     if (popupOk) {
@@ -931,7 +938,7 @@ async function msLogin() {
         'info', 20000
       );
     }
-    return; // NEVER fall through to loginRedirect when in deep iframe
+    return; // NEVER fall through to loginRedirect when in deep iframe on GitHub Pages
   }
 
   // Trình duyệt trực tiếp (không phải iframe): dùng loginRedirect
