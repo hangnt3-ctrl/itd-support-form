@@ -613,6 +613,11 @@ const state = {
 
   detectUser();
   renderQ('Q1');
+  // Nếu đang trong iframe (Teams/SharePoint) → hiện hướng dẫn ngay, không đợi user nhấn nút
+  if (window.self !== window.top) {
+    // Delay nhỏ để DOM render xong
+    setTimeout(_showTeamsGuidance, 100);
+  }
   // Đóng modal bằng phím Escape
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
   document.addEventListener('click', _clickDelegate);
@@ -653,31 +658,8 @@ async function msLogin() {
   function _restoreBtn() { if (btn) { btn.disabled = false; btn.innerHTML = msLoginHtml; } }
 
   // Trong Teams, form chạy bên trong iframe — loginRedirect và popup đều bị chặn.
-  // Hiển thị hướng dẫn mở form trong tab riêng để đăng nhập.
   if (window.self !== window.top) {
-    const formUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/';
-    const slot = document.getElementById('q-slot');
-    if (slot && !slot.querySelector('.teams-auth-msg')) {
-      const msg = document.createElement('div');
-      msg.className = 'teams-auth-msg';
-      msg.style.cssText = 'background:#fff4ce;border:1px solid #f9a825;border-radius:10px;' +
-        'padding:20px;margin-top:16px;font-family:Segoe UI,sans-serif;text-align:center';
-      msg.innerHTML =
-        '<p style="margin:0 0 6px;font-weight:600;color:#323130;font-size:14px">⚠️ Đăng nhập qua Microsoft Teams</p>' +
-        '<p style="margin:0 0 16px;font-size:13px;color:#605e5c">Teams không cho phép đăng nhập trực tiếp trong iframe.<br>' +
-        'Vui lòng mở form trong tab mới, đăng nhập, rồi quay lại và làm mới.</p>' +
-        '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
-        '<a href="' + formUrl + '" target="_blank" ' +
-        'style="display:inline-flex;align-items:center;gap:6px;background:#0078d4;color:#fff;' +
-        'text-decoration:none;padding:9px 18px;border-radius:6px;font-size:13px;font-weight:600">' +
-        '🔑 Mở để đăng nhập ↗</a>' +
-        '<button onclick="window.location.reload()" ' +
-        'style="display:inline-flex;align-items:center;gap:6px;background:#f3f2f1;color:#323130;' +
-        'border:1px solid #d2d0ce;padding:9px 18px;border-radius:6px;font-size:13px;cursor:pointer">' +
-        '↻ Làm mới trang</button>' +
-        '</div>';
-      slot.appendChild(msg);
-    }
+    _showTeamsGuidance();
     _restoreBtn();
     return;
   }
@@ -690,6 +672,39 @@ async function msLogin() {
     _restoreBtn();
     showToast('Đăng nhập thất bại: ' + (e.errorCode || e.message || e), 'error');
   }
+}
+
+// Hiển thị hướng dẫn đăng nhập qua Teams (khi ở trong iframe)
+function _showTeamsGuidance() {
+  const formUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/';
+  // Ẩn nút login chính
+  const loginWrap = document.querySelector('.login-wrap, .login-card, #btn-ms-login')?.closest('.login-card') ||
+                    document.getElementById('btn-ms-login')?.parentElement;
+  // Chỉ hiện 1 lần
+  const slot = document.getElementById('q-slot');
+  if (!slot || slot.querySelector('.teams-auth-msg')) return;
+  const msg = document.createElement('div');
+  msg.className = 'teams-auth-msg';
+  msg.style.cssText = 'background:#fff4ce;border:1px solid #f9a825;border-radius:10px;' +
+    'padding:20px 24px;margin-top:16px;font-family:Segoe UI,sans-serif;text-align:center';
+  msg.innerHTML =
+    '<p style="margin:0 0 6px;font-weight:600;color:#323130;font-size:14px">⚠️ Đăng nhập qua Microsoft Teams</p>' +
+    '<p style="margin:0 0 16px;font-size:13px;color:#605e5c;line-height:1.5">Teams không hỗ trợ đăng nhập trực tiếp trong iframe.<br>' +
+    'Nhấn <strong>Mở để đăng nhập</strong>, đăng nhập xong quay lại nhấn <strong>Làm mới</strong>.</p>' +
+    '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">' +
+    '<a href="' + formUrl + '" target="_blank" ' +
+    'style="display:inline-flex;align-items:center;gap:6px;background:#0078d4;color:#fff;' +
+    'text-decoration:none;padding:9px 20px;border-radius:6px;font-size:13px;font-weight:600">' +
+    '🔑 Mở để đăng nhập ↗</a>' +
+    '<button onclick="window.location.reload()" ' +
+    'style="display:inline-flex;align-items:center;gap:6px;background:#f3f2f1;color:#323130;' +
+    'border:1px solid #d2d0ce;padding:9px 20px;border-radius:6px;font-size:13px;cursor:pointer">' +
+    '↻ Làm mới trang</button>' +
+    '</div>';
+  slot.appendChild(msg);
+  // Ẩn nút "Đăng nhập bằng Microsoft" để tránh nhầm lẫn
+  const loginBtn = document.getElementById('btn-ms-login');
+  if (loginBtn) loginBtn.style.display = 'none';
 }
 
 // Hiển thị lịch sử theo email (gọi sau khi đăng nhập)
