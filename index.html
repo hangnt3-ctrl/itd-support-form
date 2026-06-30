@@ -6,7 +6,6 @@
 <title>Cổng hỗ trợ CNTT — Phòng CNTT HAS</title>
 <!-- MSAL.js 2.x — Microsoft Authentication Library (miễn phí, CDN) -->
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.3/lib/msal-browser.min.js"></script>
-<script src="https://res.cdn.office.net/teams-js/2.22.0/js/MicrosoftTeams.min.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 /* Khi nhúng vào SharePoint iframe: loại bỏ padding thừa, co giãn toàn chiều rộng */
@@ -385,9 +384,6 @@ const CONFIG = {
   MSAL_TENANT_ID: '010a6d4c-53ee-42a6-b68e-74c646a3297c', // Directory (tenant) ID
   // Redirect URI: URL trang này sau khi deploy lên GitHub Pages
   // VD: https://has-itd.github.io/itd-support/ITD_Support_Form.html
-  // Khi host trên SharePoint Site Assets: URL tự động = SP URL (cùng origin)
-  // Khi host trên GitHub Pages: URL = GitHub Pages URL
-  // → loginRedirect từ SharePoint không bị Teams chặn (SharePoint→Microsoft trusted)
   MSAL_REDIRECT_URI: window.location.href.split('?')[0].split('#')[0],
 
   ORG_PREFIX: 'ITD',
@@ -407,10 +403,7 @@ function _getMsalApp() {
         authority:   'https://login.microsoftonline.com/' + CONFIG.MSAL_TENANT_ID,
         redirectUri: CONFIG.MSAL_REDIRECT_URI,
       },
-      cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false },
-      system: {
-        allowRedirectInIframe: true, // Cho phép redirect ngay trong iframe (SharePoint embed)
-      },
+      cache: { cacheLocation: 'sessionStorage' },
     });
   }
   return _msalApp;
@@ -587,146 +580,8 @@ const state = {
 // ╔══════════════════════════════════════════════════════════╗
 // ║  BOOT                                                    ║
 // ╚══════════════════════════════════════════════════════════╝
-// ── Auth qua popup + BroadcastChannel (cho Teams deep-iframe) ──────────────────
-var _authBCListener = null;
-var _authPoller    = null;
-var _authResolved  = false; // guard: xử lý auth 1 lần duy nhất
-
-function _onAuthReceived(name, email) {
-  if (_authResolved) return;
-  _authResolved = true;
-  // Dừng tất cả listeners
-  if (_authBCListener) { try { _authBCListener.close(); } catch(e){} _authBCListener = null; }
-  if (_authPoller)     { clearInterval(_authPoller); _authPoller = null; }
-  // Áp dụng account
-  var accounts = _getMsalApp().getAllAccounts();
-  if (accounts.length > 0) {
-    _applyAccountToState(accounts[0]);
-  } else {
-    state.user.name  = name  || '';
-    state.user.email = email || '';
-  }
-  showHistoryByEmail();
-}
-
-// Cơ chế 1: BroadcastChannel (nếu cùng browsing context)
-function _startAuthBCListener() {
-  if (typeof BroadcastChannel === 'undefined') return;
-  try {
-    if (_authBCListener) { _authBCListener.close(); }
-    _authBCListener = new BroadcastChannel('itd_auth');
-    _authBCListener.onmessage = function(e) {
-      if (!e.data || e.data.type !== 'auth_done') return;
-      _onAuthReceived(e.data.name, e.data.email);
-    };
-  } catch(er) {}
-}
-
-// Lắng nghe postMessage từ popup window (hoạt động khi popup cùng browser, khác tab)
-var _msgListenerAdded = false;
-function _startMessageListener() {
-  if (_msgListenerAdded) return;
-  _msgListenerAdded = true;
-  window.addEventListener('message', function(e) {
-    if (e.origin !== 'https://hangnt3-ctrl.github.io') return;
-    if (!e.data || e.data.type !== 'itd_auth_done') return;
-    _onAuthReceived(e.data.name, e.data.email);
-  });
-}
-
-// Cơ chế 2: Poll localStorage mỗi giây (nếu popup và iframe dùng chung storage)
-function _startAuthPoller() {
-  var MAX = 180; // tối đa 3 phút
-  var polls = 0;
-  var initialCount = _getMsalApp().getAllAccounts().length;
-  _authPoller = setInterval(function() {
-    if (_authResolved || ++polls > MAX) { clearInterval(_authPoller); _authPoller = null; return; }
-    try {
-      var accounts = _getMsalApp().getAllAccounts();
-      if (accounts.length > initialCount) {
-        var acc = accounts[0];
-        _onAuthReceived(acc.name || acc.username || '', (acc.username || '').toLowerCase());
-      }
-    } catch(e) {}
-  }, 1000);
-}
-
-// Phát broadcast "auth_done" (gọi từ popup sau khi loginRedirect thành công)
-function _broadcastAuthDone() {
-  if (typeof BroadcastChannel === 'undefined') return;
-  try {
-    var bc = new BroadcastChannel('itd_auth');
-    var accounts = _getMsalApp().getAllAccounts();
-    var acc = accounts[0] || {};
-    bc.postMessage({
-      type:  'auth_done',
-      name:  acc.name  || acc.username || '',
-      email: (acc.username || '').toLowerCase(),
-    });
-    bc.close();
-  } catch(er) {}
-}
-
-// Gửi auth kết quả về iframe (nếu popup được mở từ iframe qua window.open)
-function _postMessageToOpener() {
-  try {
-    if (!window.opener) return;
-    var accounts = _getMsalApp().getAllAccounts();
-    var acc = accounts[0] || {};
-    var msg = {
-      type:  'itd_auth_done',
-      name:  acc.name  || acc.username || '',
-      email: (acc.username || '').toLowerCase(),
-    };
-    // Gửi về opener (iframe của form trong SharePoint/Teams)
-    window.opener.postMessage(msg, 'https://hangnt3-ctrl.github.io');
-  } catch(er) {}
-}
-
-(async function boot() {
-  // Xử lý redirect từ loginRedirect (nếu đang trở về sau đăng nhập)
-  const redirectOk = await _handleMsalRedirect();
-
-  // Nếu đang chạy trong popup standalone (itd_popup=1): đăng nhập rồi đóng
-  if (_isLoginPopupMode()) {
-    if (redirectOk) {
-      // Vừa hoàn tất loginRedirect — broadcast + postMessage về opener
-      _broadcastAuthDone();
-      _postMessageToOpener();
-      // Hiển thị trang thành công (đơn giản, không fetch SharePoint)
-      var acc = _getMsalApp().getAllAccounts()[0] || {};
-      var displayName = acc.name || acc.username || state.user.name || state.user.email || '';
-      document.body.innerHTML = '<div style="font-family:Segoe UI,sans-serif;text-align:center;' +
-        'padding:60px 24px 40px;color:#323130;max-width:420px;margin:0 auto">' +
-        '<div style="font-size:48px;margin-bottom:16px">✅</div>' +
-        '<p style="font-size:18px;font-weight:600;margin:0 0 8px">Đăng nhập thành công!</p>' +
-        '<p style="font-size:13px;color:#605e5c;margin:0 0 24px">' + (displayName ? 'Xin chào, ' + displayName + '.' : '') + '</p>' +
-        '<div style="background:#f3f2f1;border-radius:8px;padding:16px;font-size:13px;color:#323130;text-align:left">' +
-        '📋 <strong>Bước tiếp theo:</strong><br>' +
-        '• Quay lại tab Teams<br>' +
-        '• Nhấn nút <strong>"↻ Làm mới trang"</strong> trong form<br>' +
-        '• Bạn sẽ thấy lịch sử yêu cầu của mình' +
-        '</div>' +
-        '<p style="margin-top:20px;font-size:12px;color:#a19f9d">Bạn có thể đóng tab này sau khi làm mới.</p>' +
-        '</div>';
-      return;
-    }
-    // Chưa đăng nhập — tự động bắt đầu loginRedirect
-    try {
-      await _getMsalApp().loginRedirect({ scopes: SP_SCOPES });
-    } catch(e) {
-      document.body.innerHTML = '<div style="font-family:Segoe UI,sans-serif;padding:24px;color:#d13438">Lỗi: ' + (e.message||e) + '</div>';
-    }
-    return;
-  }
-
+(function boot() {
   detectUser();
-  if (redirectOk) {
-    _broadcastAuthDone(); // Thông báo cho Teams iframe đang chờ (nếu có)
-    showHistoryByEmail();
-    _setupEventListeners();
-    return;
-  }
   renderQ('Q1');
   // Đóng modal bằng phím Escape
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
@@ -747,12 +602,7 @@ function _postMessageToOpener() {
     const eq = e.target.closest('[data-edit-q]');
     if (eq && eq.dataset.editQ) { editFromConfirm(eq.dataset.editQ); return; }
   });
-  _setupEventListeners();
 })();
-
-function _setupEventListeners() {
-  // Already attached via delegation in boot — no-op if called twice (idempotent guard)
-}
 
 function detectUser() {
   if (typeof _spPageContextInfo !== 'undefined' && _spPageContextInfo.userDisplayName) {
@@ -769,188 +619,22 @@ function _applyAccountToState(account) {
   state.user.email = (account.username || '').toLowerCase();
 }
 
-
-// ── Teams SSO + Browser SSO ──────────────────────────────────────────────────
-var _teamsLoginHint = '';     // email lấy từ Teams context
-var _teamsInitialized = false;
-
-// Helper: race một promise với timeout
-function _withTimeout(promise, ms) {
-  return Promise.race([
-    promise,
-    new Promise((_, rej) => setTimeout(() => rej(new Error('timeout')), ms))
-  ]);
-}
-
-// Xử lý redirect từ loginRedirect (gọi ngay khi page load)
-async function _handleMsalRedirect() {
-  try {
-    const result = await _getMsalApp().handleRedirectPromise();
-    if (result && result.account) {
-      _applyAccountToState(result.account);
-      return true;
-    }
-  } catch(e) {
-    console.warn('[MSAL] handleRedirectPromise error:', e.errorCode || e.message);
-  }
-  return false;
-}
-
-// Thử tự đăng nhập im lặng qua Microsoft Teams context (max 3s)
-async function _tryTeamsSSO() {
-  try {
-    if (typeof microsoftTeams === 'undefined') return false;
-    if (!_teamsInitialized) {
-      await _withTimeout(microsoftTeams.app.initialize(), 2000);
-      _teamsInitialized = true;
-    }
-    const ctx = await _withTimeout(microsoftTeams.app.getContext(), 2000);
-    _teamsLoginHint = (ctx.user && (ctx.user.userPrincipalName || ctx.user.loginHint)) || '';
-    if (!_teamsLoginHint) return false;
-
-    const app = _getMsalApp();
-    // Cache hit theo email
-    const accounts = app.getAllAccounts();
-    const match = accounts.find(a =>
-      (a.username || '').toLowerCase() === _teamsLoginHint.toLowerCase()
-    );
-    if (match) {
-      try {
-        const res = await app.acquireTokenSilent({ scopes: SP_SCOPES, account: match });
-        _applyAccountToState(res.account);
-        console.log('[Teams SSO] cache hit ✓');
-        return true;
-      } catch(_e) { /* hết hạn → ssoSilent */ }
-    }
-    const res = await app.ssoSilent({ scopes: SP_SCOPES, loginHint: _teamsLoginHint });
-    _applyAccountToState(res.account);
-    console.log('[Teams SSO] ssoSilent ✓');
-    return true;
-  } catch(e) {
-    console.warn('[Teams SSO] fail:', e.errorCode || e.message || e);
-    return false;
-  }
-}
-
-// Fallback: browser SSO thuần (Chrome/Edge đã đăng nhập Microsoft)
-// Dùng Microsoft session cookie trong trình duyệt, không cần loginHint
-async function _tryBrowserSSO() {
-  try {
-    const app = _getMsalApp();
-    // Thử cache không cần hint
-    const accounts = app.getAllAccounts();
-    if (accounts.length > 0) {
-      try {
-        const res = await app.acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] });
-        _applyAccountToState(res.account);
-        console.log('[Browser SSO] cache ✓');
-        return true;
-      } catch(_e) { /* hết hạn */ }
-    }
-    // ssoSilent không hint: dùng session cookie Microsoft (hoạt động trên Chrome/Edge)
-    const res = await app.ssoSilent({ scopes: SP_SCOPES });
-    _applyAccountToState(res.account);
-    console.log('[Browser SSO] ssoSilent ✓');
-    return true;
-  } catch(e) {
-    // block_iframe_reload = MSAL chủ động chặn để tránh vòng lặp iframe — bình thường
-    if (e.errorCode !== 'block_iframe_reload') {
-      console.warn('[Browser SSO] fail:', e.errorCode || e.message || e);
-    }
-    return false;
-  }
-}
-
-// Mở popup đăng nhập độc lập (thoát khỏi iframe, dùng loginRedirect bình thường)
-// Popup ghi token vào localStorage, broadcast về iframe qua BroadcastChannel
-function _openLoginPopup() {
-  var popupUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/?itd_popup=1';
-  _authResolved = false;
-  var w = null;
-  // Không dùng size params → Teams mở dưới dạng tab trong WKWebView (cùng process, cùng localStorage)
-  try { w = window.open(popupUrl, '_blank'); } catch(e) {}
-  if (w) {
-    _startAuthBCListener();
-    _startMessageListener(); // postMessage từ popup (hoạt động qua tab boundaries)
-    _startAuthPoller();      // localStorage poll (fallback)
-    return true;
-  }
-  return false;
-}
-
-// Kiểm tra xem app đang chạy trong popup standalone (không phải iframe)
-function _isLoginPopupMode() {
-  try {
-    return window.location.search.includes('itd_popup=1') ||
-           window.location.hash.includes('itd_popup=1');
-  } catch(e) { return false; }
-}
-
-// Đăng nhập Microsoft
+// Đăng nhập Microsoft — gọi từ nút trên Q1 (user gesture → popup hoạt động)
 async function msLogin() {
   const btn = document.getElementById('btn-ms-login');
-  const msLoginSvg = `<svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Đăng nhập bằng Microsoft`;
-  function _restoreBtn() { if (btn) { btn.disabled = false; btn.innerHTML = msLoginSvg; } }
-
-  const inIframe = window.self !== window.top;
-  // Khi host trên SharePoint (cùng origin), Teams không chặn redirect SharePoint→Microsoft
-  // Khi host trên GitHub Pages (cross-origin), Teams chặn → cần popup
-  const isSharePointHost = window.location.hostname.endsWith('.sharepoint.com');
-  // Iframe sâu (2+ cấp) trên GitHub Pages: dùng popup. Tất cả trường hợp khác: loginRedirect
-  const isDeepIframe = inIframe && (window.parent !== window.top);
-  const needsPopup = inIframe && isDeepIframe && !isSharePointHost;
-
-  if (needsPopup) {
-    // Trong iframe sâu trên GitHub Pages: loginRedirect bị chặn → dùng popup window riêng
-    if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang mở cửa sổ đăng nhập...'; }
-    const popupOk = _openLoginPopup();
-    if (popupOk) {
-      _restoreBtn();
-      // Hiển thị hướng dẫn + nút Làm mới (phòng khi BroadcastChannel/polling không hoạt động)
-      var slot = document.getElementById('q-slot');
-      if (slot) {
-        var existingMsg = slot.querySelector('.itd-popup-msg');
-        if (!existingMsg) {
-          var msgDiv = document.createElement('div');
-          msgDiv.className = 'itd-popup-msg';
-          msgDiv.style.cssText = 'background:#fff8e1;border:1px solid #f9a825;border-radius:8px;' +
-            'padding:16px;margin-top:16px;font-family:Segoe UI,sans-serif;font-size:13px;text-align:center';
-          msgDiv.innerHTML = '<p style="margin:0 0 12px;color:#323130">⏳ Đang chờ đăng nhập từ cửa sổ mới...<br>' +
-            '<span style="color:#605e5c;font-size:12px">Sau khi đăng nhập xong, trang này sẽ tự cập nhật.</span></p>' +
-            '<button onclick="window.location.reload()" style="background:#0078d4;color:#fff;border:none;' +
-            'border-radius:6px;padding:8px 20px;cursor:pointer;font-size:13px">↻ Làm mới trang</button>';
-          slot.appendChild(msgDiv);
-        }
-      }
-    } else {
-      // window.open bị chặn — hiển thị link để user click thủ công
-      _restoreBtn();
-      const popupUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/?itd_popup=1';
-      _authResolved = false;
-      _startAuthBCListener();
-      _startMessageListener();
-      _startAuthPoller();
-      showToast(
-        '<a href="' + popupUrl + '" target="_blank" ' +
-        'style="color:#fff;text-decoration:underline;font-weight:600" ' +
-        'onclick="event.stopPropagation()">Nhấn đây để mở cửa sổ đăng nhập ↗</a>' +
-        ' (sau khi đăng nhập xong, quay lại trang này)',
-        'info', 20000
-      );
-    }
-    return; // NEVER fall through to loginRedirect when in deep iframe on GitHub Pages
-  }
-
-  // Trình duyệt trực tiếp (không phải iframe): dùng loginRedirect
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang chuyển hướng...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang đăng nhập...'; }
   try {
     const app = _getMsalApp();
-    const req = { scopes: SP_SCOPES, redirectStartPage: window.location.href };
-    if (_teamsLoginHint) req.loginHint = _teamsLoginHint;
-    await app.loginRedirect(req);
+    const result = await app.acquireTokenPopup({ scopes: SP_SCOPES });
+    _applyAccountToState(result.account);
+    // Chuyển sang màn hình lịch sử
+    showHistoryByEmail();
   } catch(e) {
-    _restoreBtn();
-    showToast('Đăng nhập thất bại: ' + (e.errorCode || e.message || e), 'error');
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<svg width="18" height="18" viewBox="0 0 21 21" xmlns="http://www.w3.org/2000/svg"><rect x="1" y="1" width="9" height="9" fill="#f25022"/><rect x="11" y="1" width="9" height="9" fill="#7fba00"/><rect x="1" y="11" width="9" height="9" fill="#00a4ef"/><rect x="11" y="11" width="9" height="9" fill="#ffb900"/></svg> Đăng nhập bằng Microsoft`;
+    }
+    showToast('Đăng nhập thất bại: ' + (e.message||e), 'error');
   }
 }
 
@@ -1324,23 +1008,17 @@ function attachListeners(q) {
   if (q.id === 'Q1') {
     // Auto-detect MSAL cached account (đăng nhập từ phiên trước)
     if (!state.user.name) {
-      // Bước 1: thử MSAL cache trước (không cần network)
       try {
         const cached = _getMsalApp().getAllAccounts();
         if (cached.length > 0) {
           _applyAccountToState(cached[0]);
+          // Re-render Q1 với trạng thái đã login
           renderQ('Q1');
           return;
         }
       } catch {}
-      // Bước 2: thử Teams SSO → Browser SSO → login button (async, không block UI)
+      // Chưa login → nút login hiện, Next disabled
       setNextEnabled(false);
-      _tryTeamsSSO()
-        .then(ok => ok || _tryBrowserSSO())  // nếu Teams fail → thử browser
-        .then(ok => {
-          if (ok) renderQ('Q1');
-          // Nếu cả hai fail → nút Login vẫn hiển thị, user bấm thủ công
-        });
       return;
     }
     // Đã login → enable Next nếu đã chọn nhóm
@@ -2604,7 +2282,6 @@ function initials(name) {
 // Dùng đúng origin của SP thay vì '*' để tránh cross-origin information leak
 const _SP_ORIGIN = (() => { try { return new URL(CONFIG.SP_SITE).origin; } catch{ return '*'; } })();
 function notifyHeight() {
-  if (window.self === window.top) return; // không trong iframe → bỏ qua
   const h = document.body.scrollHeight;
   try { window.parent.postMessage({ type:'resize', height: h + 32 }, _SP_ORIGIN); } catch{}
 }
@@ -2696,4 +2373,6 @@ _resizeObs.observe(document.body);
 ║  2. Paste:                                                    ║
 ║                                                              ║
 ║  function doPost(e) {                                         ║
-�
+║    const d  = JSON.parse(e.postData.contents);               ║
+║    const ss = SpreadsheetApp.getActiveSpreadsheet();         ║
+║    let sh   = ss.ge
