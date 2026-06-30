@@ -584,7 +584,27 @@ const state = {
 // ╚══════════════════════════════════════════════════════════╝
 // ── Auth qua popup + BroadcastChannel (cho Teams deep-iframe) ──────────────────
 var _authBCListener = null;
+var _authPoller    = null;
+var _authResolved  = false; // guard: xử lý auth 1 lần duy nhất
 
+function _onAuthReceived(name, email) {
+  if (_authResolved) return;
+  _authResolved = true;
+  // Dừng tất cả listeners
+  if (_authBCListener) { try { _authBCListener.close(); } catch(e){} _authBCListener = null; }
+  if (_authPoller)     { clearInterval(_authPoller); _authPoller = null; }
+  // Áp dụng account
+  var accounts = _getMsalApp().getAllAccounts();
+  if (accounts.length > 0) {
+    _applyAccountToState(accounts[0]);
+  } else {
+    state.user.name  = name  || '';
+    state.user.email = email || '';
+  }
+  showHistoryByEmail();
+}
+
+// Cơ chế 1: BroadcastChannel (nếu cùng browsing context)
 function _startAuthBCListener() {
   if (typeof BroadcastChannel === 'undefined') return;
   try {
@@ -592,21 +612,26 @@ function _startAuthBCListener() {
     _authBCListener = new BroadcastChannel('itd_auth');
     _authBCListener.onmessage = function(e) {
       if (!e.data || e.data.type !== 'auth_done') return;
-      _authBCListener.close(); _authBCListener = null;
-      // Token đã được popup ghi vào localStorage (cùng origin)
-      var accounts = _getMsalApp().getAllAccounts();
-      if (accounts.length > 0) {
-        _applyAccountToState(accounts[0]);
-        _getMsalApp().acquireTokenSilent({ scopes: SP_SCOPES, account: accounts[0] })
-          .catch(function(){})
-          .finally(function(){ showHistoryByEmail(); });
-      } else if (e.data.email) {
-        state.user.name  = e.data.name  || '';
-        state.user.email = e.data.email || '';
-        showHistoryByEmail();
-      }
+      _onAuthReceived(e.data.name, e.data.email);
     };
   } catch(er) {}
+}
+
+// Cơ chế 2: Poll localStorage mỗi giây (nếu popup và iframe dùng chung storage)
+function _startAuthPoller() {
+  var MAX = 180; // tối đa 3 phút
+  var polls = 0;
+  var initialCount = _getMsalApp().getAllAccounts().length;
+  _authPoller = setInterval(function() {
+    if (_authResolved || ++polls > MAX) { clearInterval(_authPoller); _authPoller = null; return; }
+    try {
+      var accounts = _getMsalApp().getAllAccounts();
+      if (accounts.length > initialCount) {
+        var acc = accounts[0];
+        _onAuthReceived(acc.name || acc.username || '', (acc.username || '').toLowerCase());
+      }
+    } catch(e) {}
+  }, 1000);
 }
 
 // Phát broadcast "auth_done" (gọi từ popup sau khi loginRedirect thành công)
@@ -795,14 +820,15 @@ async function _tryBrowserSSO() {
 // Popup ghi token vào localStorage, broadcast về iframe qua BroadcastChannel
 function _openLoginPopup() {
   var popupUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/?itd_popup=1';
-  // Thử window.open (user gesture — có thể bypass block)
+  _authResolved = false; // reset guard
   var w = null;
   try { w = window.open(popupUrl, 'itd_login', 'width=520,height=640,left=200,top=100'); } catch(e) {}
   if (w) {
-    _startAuthBCListener();
-    return true; // popup mở được
+    _startAuthBCListener(); // BroadcastChannel (nếu cùng context)
+    _startAuthPoller();     // localStorage poll (fallback)
+    return true;
   }
-  return false; // popup bị chặn — fallback về link
+  return false;
 }
 
 // Kiểm tra xem app đang chạy trong popup standalone (không phải iframe)
@@ -833,7 +859,9 @@ async function msLogin() {
       // window.open bị chặn — hiển thị link để user click thủ công
       _restoreBtn();
       const popupUrl = 'https://hangnt3-ctrl.github.io/itd-support-form/?itd_popup=1';
+      _authResolved = false;
       _startAuthBCListener();
+      _startAuthPoller();
       showToast(
         '<a href="' + popupUrl + '" target="_blank" ' +
         'style="color:#fff;text-decoration:underline;font-weight:600" ' +
