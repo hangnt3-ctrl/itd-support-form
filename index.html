@@ -888,9 +888,13 @@ async function msLogin() {
   function _restoreBtn() { if (btn) { btn.disabled = false; btn.innerHTML = msLoginSvg; } }
 
   const inIframe = window.self !== window.top;
+  // Phân biệt iframe 1 cấp (Teams Website tab) vs 2+ cấp (SharePoint embed)
+  // Ở 1 cấp: parent === top → loginRedirect có thể hoạt động trong Teams Website tab
+  // Ở 2+ cấp: parent !== top → loginRedirect bị Teams/SharePoint chặn → cần popup
+  const isDeepIframe = inIframe && (window.parent !== window.top);
 
-  if (inIframe) {
-    // Trong iframe: loginRedirect bị chặn, Teams SDK timeout → dùng popup window riêng
+  if (inIframe && isDeepIframe) {
+    // Trong iframe sâu (SharePoint embed): loginRedirect bị chặn → dùng popup window riêng
     if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>Đang mở cửa sổ đăng nhập...'; }
     const popupOk = _openLoginPopup();
     if (popupOk) {
@@ -927,7 +931,7 @@ async function msLogin() {
         'info', 20000
       );
     }
-    return; // NEVER fall through to loginRedirect when in iframe
+    return; // NEVER fall through to loginRedirect when in deep iframe
   }
 
   // Trình duyệt trực tiếp (không phải iframe): dùng loginRedirect
@@ -2685,4 +2689,4 @@ _resizeObs.observe(document.body);
 ║  2. Paste:                                                    ║
 ║                                                              ║
 ║  function doPost(e) {                                         ║
-�
+�
